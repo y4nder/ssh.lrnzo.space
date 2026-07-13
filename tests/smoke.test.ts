@@ -219,7 +219,10 @@ test(
       await collectUntil(stream, (s) => containsCI(s, "guestbook"))
       stream.write("n") // compose form
       await collectUntil(stream, (s) => containsCI(s, "name (optional)"))
-      stream.write("ci-guest\r") // name, enter advances to message
+      // name with a typo corrected by two backspaces (\x7f) — the META-line
+      // match below only succeeds if they actually deleted the "xq", so this
+      // doubles as backspace regression coverage; enter advances to message
+      stream.write("ci-guestxq\x7f\x7f\r")
       stream.write("hello from the smoke test\r") // message, enter submits
       // the message text already streamed as compose-field echo, so match the
       // entry META line — "name · date" only exists in the browse list
@@ -247,6 +250,29 @@ test(
       stream.write("\r") // skip the name field
       stream.write("second attempt\r")
       await collectUntil(stream, (s) => containsCI(s, "rate limited"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "arrow keys move the compose cursor for mid-text edits",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("b")
+      await collectUntil(stream, (s) => containsCI(s, "guestbook"))
+      stream.write("n")
+      await collectUntil(stream, (s) => containsCI(s, "name (optional)"))
+      // type "bd", arrow-left to the start, insert "a" — every cell of the
+      // field shifts, so the corrected "abd" streams contiguously (see the
+      // diff-render NOTE above); no submit, so this stays rate-limit-free
+      stream.write("bd\x1b[D\x1b[Da")
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "abd"))
     } finally {
       client.end()
     }

@@ -1,45 +1,21 @@
-import { useEffect, useMemo, useState } from "react"
-import { TextAttributes } from "@opentui/core"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { TextAttributes, type InputRenderable } from "@opentui/core"
 import { useKeyboard } from "@opentui/react"
 import { getStore, MSG_MAX, NAME_MAX, type GuestbookEntry } from "../../db"
 import { identity } from "../content"
 import { buildGuestbookLines, gbRows, type GbLine } from "../guestbook"
 import { useTheme } from "../theme"
-import { wrapText } from "../util"
-import { Cursor } from "./Cursor"
 import { Label } from "./Label"
 import { Rule } from "./Rule"
 import { StatusBar } from "./StatusBar"
 
-// Compose form state lives in ONE object updated functionally: pasted or
-// coalesced input delivers many key events in a single React batch, and
-// per-key setState against the render closure would land every char in
-// whichever field the last COMMITTED state had (enter's field switch included).
-// A reducer-style updater sees the accumulated state for each event instead.
+// The compose fields are UNCONTROLLED OpenTUI <input> renderables: they own
+// the buffer, cursor, and editing keys (arrows, home/end, word ops, undo).
+// React state only mirrors their values via onInput — for the char counter
+// and for the submit effect below — in one object updated functionally, so
+// a batch of events (paste, fast typing, enter) sees accumulated state
+// instead of the stale render closure.
 type ComposeState = { field: "name" | "message"; name: string; msg: string; submit: boolean }
-
-function reduceComposeKey(
-  c: ComposeState,
-  key: { name: string; sequence?: string; ctrl?: boolean; meta?: boolean },
-): ComposeState {
-  if (c.submit) return c // a submit is in flight; ignore trailing input
-  if (key.name === "return") {
-    if (c.field === "name") return { ...c, field: "message" }
-    return c.msg.trim() ? { ...c, submit: true } : c
-  }
-  if (key.name === "tab") return { ...c, field: c.field === "name" ? "message" : "name" }
-  if (key.name === "backspace") {
-    return c.field === "name" ? { ...c, name: c.name.slice(0, -1) } : { ...c, msg: c.msg.slice(0, -1) }
-  }
-  // printable ASCII only, one char at a time — escape sequences, paste
-  // markers, and unicode never make it into the buffer (db.ts sanitizes
-  // again before the row lands)
-  const seq = key.sequence
-  if (key.ctrl || key.meta || typeof seq !== "string" || seq.length !== 1) return c
-  if (seq < "\x20" || seq > "\x7E") return c
-  if (c.field === "name") return c.name.length < NAME_MAX ? { ...c, name: c.name + seq } : c
-  return c.msg.length < MSG_MAX ? { ...c, msg: c.msg + seq } : c
-}
 
 // The guestbook takeover: `b` swaps the entire frame for this page (same
 // pattern as the CV — a 6th tab doesn't fit the tab bar at min width). Unlike
@@ -71,13 +47,15 @@ export function GuestbookPage({
   // null = browse; see ComposeState above for why this is a single object
   const [compose, setCompose] = useState<ComposeState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const msgInputRef = useRef<InputRenderable>(null)
 
   const lines = useMemo(() => buildGuestbookLines(entries, width), [entries, width])
   const rows = gbRows(height)
   const maxScroll = Math.max(0, lines.length - rows)
 
-  // The DB write happens here, not in the key handler: the handler only sees
-  // render-time buffers, which are stale while a batch of key events commits.
+  // The DB write happens here, not in the inputs' onSubmit: that callback
+  // closes over render-time state, which is stale while a batch of input
+  // events commits. This effect reads the fully committed compose state.
   useEffect(() => {
     if (!compose?.submit) return
     const result = store.addEntry(ip, compose.name, compose.msg)
@@ -107,7 +85,22 @@ export function GuestbookPage({
         setError(null)
         return
       }
-      setCompose((c) => (c ? reduceComposeKey(c, key) : c))
+      if (key.name === "tab") {
+        setCompose((c) => (c ? { ...c, field: c.field === "name" ? "message" : "name" } : c))
+        return
+      }
+      // Printable-ASCII-only policy (db.ts sanitizes again before the row
+      // lands): global keypress listeners run BEFORE the focused input's
+      // handler, so preventDefault here keeps unicode out of its buffer.
+      // Only block sequences the input would INSERT as text — its insert
+      // guard takes first char >= \x20 and != \x7f. Everything outside that
+      // is a named key the input must still see: arrows/delete/home start
+      // with \x1b, backspace is the bare DEL byte \x7f.
+      const seq = key.sequence
+      if (typeof seq === "string" && seq.length > 0) {
+        const first = seq.charCodeAt(0)
+        if (first >= 0x20 && first !== 0x7f && /[^\x20-\x7E]/.test(seq)) key.preventDefault()
+      }
       return
     }
 
@@ -166,18 +159,6 @@ export function GuestbookPage({
     }
   }
 
-  // Buffers can outgrow one row (message is 120 chars, min frame is 64 wide);
-  // wrap them here like every other fixed layout in the app.
-  const renderField = (buf: string, active: boolean) => {
-    const fieldLines = wrapText(buf, width - 2)
-    return fieldLines.map((line, i) => (
-      <text key={i} flexShrink={0} fg={theme.fg}>
-        {line || (active ? "" : " ")}
-        {active && i === fieldLines.length - 1 ? <Cursor /> : null}
-      </text>
-    ))
-  }
-
   const offset = Math.min(scroll, maxScroll)
   const visible = lines.slice(offset, offset + rows)
   const below = lines.length - offset - visible.length
@@ -225,7 +206,30 @@ export function GuestbookPage({
       ) : (
         <box flexDirection="column" paddingTop={1} overflow="hidden">
           <Label text="Name (optional)" accent={compose.field === "name"} />
-          {renderField(compose.name, compose.field === "name")}
+          <input
+            width="100%"
+            flexShrink={0}
+            focused={compose.field === "name"}
+            maxLength={NAME_MAX}
+            textColor={theme.fg}
+            focusedTextColor={theme.fg}
+            cursorColor={theme.accent}
+            placeholder="ANONYMOUS"
+            placeholderColor={theme.faint}
+            onInput={(v) => setCompose((c) => (c && !c.submit ? { ...c, name: v } : c))}
+            onSubmit={() => {
+              // Hand focus over IMPERATIVELY, not via the focused prop: a
+              // pasted "name\rmessage" arrives as one synchronous batch of
+              // key events, and React won't re-render (flip focused props)
+              // until the whole batch is processed — by which time every
+              // message char would have landed in this field. focus() blurs
+              // the name input in the same tick, so the very next key event
+              // already goes to the message input. The state update below
+              // then flips the focused props to match (both become no-ops).
+              msgInputRef.current?.focus()
+              setCompose((c) => (c ? { ...c, field: "message" } : c))
+            }}
+          />
           <text flexShrink={0}> </text>
           <box flexDirection="row" width="100%" height={1} flexShrink={0}>
             <Label text="Message" accent={compose.field === "message"} />
@@ -234,7 +238,20 @@ export function GuestbookPage({
               {compose.msg.length}/{MSG_MAX}
             </text>
           </box>
-          {renderField(compose.msg, compose.field === "message")}
+          <input
+            ref={msgInputRef}
+            width="100%"
+            flexShrink={0}
+            focused={compose.field === "message"}
+            maxLength={MSG_MAX}
+            textColor={theme.fg}
+            focusedTextColor={theme.fg}
+            cursorColor={theme.accent}
+            onInput={(v) => setCompose((c) => (c && !c.submit ? { ...c, msg: v } : c))}
+            onSubmit={() =>
+              setCompose((c) => (c && !c.submit && c.msg.trim() ? { ...c, submit: true } : c))
+            }
+          />
           <text flexShrink={0}> </text>
           <text flexShrink={0} fg={theme.accent}>
             {error ?? " "}
