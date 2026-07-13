@@ -49,6 +49,12 @@ Hard-won details baked into the code:
 
 ```bash
 bun install
+bun run local        # UI iteration: renders in *this* terminal, live-reloads on save
+```
+
+For session-level behavior (auth, resize, disconnects) run the real server:
+
+```bash
 ssh-keygen -t ed25519 -f keys/host_key -N ""   # once
 bun run dev                                     # then: ssh -p 2222 localhost
 bun run typecheck
