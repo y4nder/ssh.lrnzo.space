@@ -14,8 +14,8 @@ export const identity = {
   banner: "lorenzo",
   name: "Lorenzo Lubguban",
   tagline: "software engineer",
-  // shown in the hint bar and contact section once the domain's A record is live
-  sshCommand: "ssh <yourdomain>",
+  // drop the -p flag once the port 22 cutover is done
+  sshCommand: "ssh -p 2222 lrnzo.space",
 }
 
 export const about = {
