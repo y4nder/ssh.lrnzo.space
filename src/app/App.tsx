@@ -1,103 +1,165 @@
 import { useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
-import { identity, theme } from "./content"
+import { experience, honors, projects } from "./content"
+import { SECTIONS, type SectionId } from "./nav"
+import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
+import { Header } from "./components/Header"
+import { Rule } from "./components/Rule"
+import { Splash } from "./components/Splash"
+import { StatusBar, type Hint } from "./components/StatusBar"
+import { TabBar } from "./components/TabBar"
 import { About } from "./sections/About"
-import { Projects } from "./sections/Projects"
 import { Contact } from "./sections/Contact"
+import { Experience } from "./sections/Experience"
+import { Honors } from "./sections/Honors"
+import { Projects } from "./sections/Projects"
 
-const MIN_COLS = 60
-const MIN_ROWS = 15
+const MIN_COLS = 64
+const MIN_ROWS = 16
 
-type Screen = "home" | "about" | "projects" | "contact"
-
-const MENU: Array<{ label: string; screen: Screen }> = [
-  { label: "about", screen: "about" },
-  { label: "projects", screen: "projects" },
-  { label: "contact", screen: "contact" },
-]
+const LIST_COUNTS: Record<SectionId, number> = {
+  about: 0,
+  experience: experience.length,
+  projects: projects.length,
+  honors: honors.length,
+  contact: 0,
+}
 
 export function App({ onExit }: { onExit: () => void }) {
   const { width, height } = useTerminalDimensions()
-  const [screen, setScreen] = useState<Screen>("home")
-  const [selected, setSelected] = useState(0)
+  const [themeName, setThemeName] = useState<ThemeName>("signal")
+  const [phase, setPhase] = useState<"splash" | "main">("splash")
+  const [sectionIdx, setSectionIdx] = useState(0)
+  const [cursors, setCursors] = useState<Record<SectionId, number>>({
+    about: 0,
+    experience: 0,
+    projects: 0,
+    honors: 0,
+    contact: 0,
+  })
+
+  const theme = THEMES[themeName]
+  const section = SECTIONS[sectionIdx]!
+  const listCount = LIST_COUNTS[section.id]
+
+  const moveCursor = (to: (current: number) => number) => {
+    if (listCount === 0) return
+    setCursors((c) => ({
+      ...c,
+      [section.id]: Math.max(0, Math.min(listCount - 1, to(c[section.id]))),
+    }))
+  }
 
   useKeyboard((key) => {
     if (key.eventType === "release") return
-    if (key.name === "q" || (key.ctrl && key.name === "c")) {
+    if (phase === "splash") return // Splash owns the keyboard until it finishes
+    if (key.name === "q" || key.name === "escape" || (key.ctrl && key.name === "c")) {
       onExit()
       return
     }
-    if (screen === "home") {
-      if (key.name === "down" || key.name === "j") {
-        setSelected((s) => (s + 1) % MENU.length)
-      } else if (key.name === "up" || key.name === "k") {
-        setSelected((s) => (s - 1 + MENU.length) % MENU.length)
-      } else if (key.name === "return" || key.name === "l" || key.name === "right") {
-        setScreen(MENU[selected]!.screen)
-      } else if (key.number && MENU[Number(key.name) - 1]) {
-        setScreen(MENU[Number(key.name) - 1]!.screen)
-      }
-    } else if (
-      key.name === "escape" ||
-      key.name === "backspace" ||
-      key.name === "h" ||
-      key.name === "left"
-    ) {
-      setScreen("home")
+    if (key.name === "t") {
+      setThemeName(nextTheme)
+      return
     }
+    if (key.name === "tab") {
+      setSectionIdx((i) => (i + (key.shift ? -1 : 1) + SECTIONS.length) % SECTIONS.length)
+      return
+    }
+    if (key.name === "right") {
+      setSectionIdx((i) => (i + 1) % SECTIONS.length)
+      return
+    }
+    if (key.name === "left") {
+      setSectionIdx((i) => (i - 1 + SECTIONS.length) % SECTIONS.length)
+      return
+    }
+    if (key.number && SECTIONS[Number(key.name) - 1]) {
+      setSectionIdx(Number(key.name) - 1)
+      return
+    }
+    const jump = SECTIONS.findIndex((s) => s.key === key.name && !key.shift)
+    if (jump >= 0) {
+      setSectionIdx(jump)
+      return
+    }
+    if (key.name === "j" || key.name === "down") moveCursor((n) => n + 1)
+    else if (key.name === "k" || key.name === "up") moveCursor((n) => n - 1)
+    else if (key.name === "g" && key.shift) moveCursor(() => listCount - 1)
+    else if (key.name === "g") moveCursor(() => 0)
   })
 
   if (width < MIN_COLS || height < MIN_ROWS) {
     return (
-      <box flexGrow={1} justifyContent="center" alignItems="center">
-        <text fg={theme.yellow}>
-          please enlarge your terminal to at least {MIN_COLS}x{MIN_ROWS}
-        </text>
-      </box>
+      <ThemeContext.Provider value={theme}>
+        <box
+          flexGrow={1}
+          justifyContent="center"
+          alignItems="center"
+          backgroundColor={theme.bg}
+        >
+          <text fg={theme.accent}>
+            ENLARGE TERMINAL TO AT LEAST {MIN_COLS}x{MIN_ROWS}
+          </text>
+        </box>
+      </ThemeContext.Provider>
     )
   }
 
-  return (
-    <box flexGrow={1} flexDirection="column" alignItems="center" justifyContent="center">
-      <ascii-font text={identity.banner} font="block" color={theme.accent} />
-      <text fg={theme.dim}>{identity.tagline}</text>
-      <text> </text>
-      <box
-        border
-        borderStyle="rounded"
-        borderColor={theme.dim}
-        flexDirection="column"
-        width={Math.min(64, width - 4)}
-        padding={1}
-      >
-        {screen === "home" ? <Menu selected={selected} /> : null}
-        {screen === "about" ? <About /> : null}
-        {screen === "projects" ? <Projects /> : null}
-        {screen === "contact" ? <Contact /> : null}
-      </box>
-      <text> </text>
-      <text fg={theme.dim}>
-        {screen === "home"
-          ? "↑/↓ or j/k · enter to open · q to quit"
-          : "esc or h to go back · q to quit"}
-      </text>
-    </box>
-  )
-}
+  if (phase === "splash") {
+    return (
+      <ThemeContext.Provider value={theme}>
+        <Splash onDone={() => setPhase("main")} onExit={onExit} />
+      </ThemeContext.Provider>
+    )
+  }
 
-function Menu({ selected }: { selected: number }) {
+  // The app lives in a fixed frame centered on the screen — the hierarchy
+  // converges on the middle instead of bleeding to the terminal edges.
+  const frameW = Math.min(84, width - 4)
+  const frameH = Math.min(32, height - 2)
+
+  // Full masthead only on roomy frames; the banner alone is 66x6.
+  const compact = frameW < 76 || frameH < 26
+  const headerRows = compact ? 1 : 7
+  const contentHeight = Math.max(4, frameH - headerRows - 6)
+
+  const hints: Hint[] = [
+    ...(listCount > 0 ? [{ key: "j/k", label: "move" }] : []),
+    { key: "tab", label: "section" },
+    { key: "t", label: "theme" },
+    { key: "q", label: "quit" },
+  ]
+
   return (
-    <box flexDirection="column" paddingLeft={1}>
-      <text fg={theme.fg}>
-        {identity.name} — {identity.tagline}
-      </text>
-      <text> </text>
-      {MENU.map((item, i) => (
-        <text key={item.screen} fg={i === selected ? theme.accent : theme.fg}>
-          {i === selected ? "❯ " : "  "}
-          {i + 1}. {item.label}
-        </text>
-      ))}
-    </box>
+    <ThemeContext.Provider value={theme}>
+      <box
+        flexGrow={1}
+        justifyContent="center"
+        alignItems="center"
+        backgroundColor={theme.bg}
+      >
+        <box flexDirection="column" width={frameW} height={frameH}>
+          <Header compact={compact} />
+          <Rule heavy width={frameW} />
+          <TabBar active={section.id} width={frameW} />
+          <Rule width={frameW} />
+          <box flexGrow={1} flexDirection="column" paddingTop={1} overflow="hidden">
+            {section.id === "about" ? <About /> : null}
+            {section.id === "experience" ? (
+              <Experience selected={cursors.experience} height={contentHeight} width={frameW} />
+            ) : null}
+            {section.id === "projects" ? (
+              <Projects selected={cursors.projects} height={contentHeight} width={frameW} />
+            ) : null}
+            {section.id === "honors" ? (
+              <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
+            ) : null}
+            {section.id === "contact" ? <Contact /> : null}
+          </box>
+          <Rule width={frameW} />
+          <StatusBar hints={hints} right={`theme: ${theme.name} ✳`} />
+        </box>
+      </box>
+    </ThemeContext.Provider>
   )
 }

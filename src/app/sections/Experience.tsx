@@ -1,12 +1,12 @@
 import { TextAttributes } from "@opentui/core"
-import { projects } from "../content"
+import { experience } from "../content"
 import { useTheme } from "../theme"
 import { Label } from "../components/Label"
 import { Rule } from "../components/Rule"
 import { SelectableList } from "../components/SelectableList"
-import { fitLines } from "../util"
+import { fitLines, wrapEstimate } from "../util"
 
-export function Projects({
+export function Experience({
   selected,
   height,
   width,
@@ -17,26 +17,30 @@ export function Projects({
 }) {
   const theme = useTheme()
   const contentWidth = width
-  const count = projects.length
+  const count = experience.length
 
   const listVisible = Math.min(count, Math.max(3, height - 12))
   const listBlock = listVisible + (count > listVisible ? 2 : 0)
   const detailRows = Math.max(3, height - listBlock - 2)
 
-  const p = projects[selected]!
-  const meta = [p.dates, p.url].filter(Boolean).join(" · ")
-  const paragraphs = [p.tagline, ...p.bullets.map((b) => `✳ ${b}`)]
+  const entry = experience[selected]!
+  const meta = [entry.dates, entry.location, entry.type].filter(Boolean).join(" · ")
+  const paragraphs = [
+    ...(entry.summary ? [entry.summary] : []),
+    ...entry.bullets.map((b) => `✳ ${b}`),
+  ]
+  // title + meta + blank + skills line stay fixed; paragraphs get the rest
   const { shown, hidden } = fitLines(paragraphs, contentWidth - 2, Math.max(1, detailRows - 4))
 
   return (
     <box flexDirection="column" width="100%">
-      <Label text="N3 / Projects" />
+      <Label text="N2 / Experience" />
       <SelectableList
         count={count}
         selected={selected}
         visible={listVisible}
         renderRow={(i, isSelected) => {
-          const proj = projects[i]!
+          const e = experience[i]!
           return (
             <>
               <text flexShrink={0} fg={isSelected ? theme.barFg : theme.dim}>
@@ -44,10 +48,10 @@ export function Projects({
                 N{i + 1}{" "}
               </text>
               <text fg={isSelected ? theme.barFg : theme.fg} flexGrow={1} flexShrink={1} height={1}>
-                {proj.name.toUpperCase()}
+                {e.role.toUpperCase()} — {e.company.toUpperCase()}
               </text>
               <text flexShrink={0} fg={isSelected ? theme.barFg : theme.dim}>
-                {(proj.tech[0] ?? "").toUpperCase()}{" "}
+                {e.dates.toUpperCase()}{" "}
               </text>
             </>
           )
@@ -57,9 +61,10 @@ export function Projects({
       <box flexDirection="column" width="100%">
         <text flexShrink={0}>
           <span fg={theme.fg} attributes={TextAttributes.BOLD}>
-            {p.name.toUpperCase()}
+            {entry.role.toUpperCase()}
           </span>
-          <span fg={theme.accent}>.END</span>
+          <span fg={theme.accent}> ✳ </span>
+          <span fg={theme.fg}>{entry.company.toUpperCase()}</span>
         </text>
         <text flexShrink={0} fg={theme.dim}>
           {meta.toUpperCase()}
@@ -83,7 +88,7 @@ export function Projects({
           </text>
         ) : null}
         <text flexShrink={0} fg={theme.dim}>
-          STACK: {p.tech.join(" · ").toUpperCase()}
+          STACK: {entry.skills.join(" · ").toUpperCase()}
         </text>
       </box>
     </box>

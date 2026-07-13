@@ -7,6 +7,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { Client, type ClientChannel } from "ssh2"
 import { identity } from "../src/app/content"
+import { THEMES } from "../src/app/theme"
+
+// The UI renders copy in ALL CAPS, so predicates must be case-insensitive.
+const containsCI = (all: string, needle: string) => all.toLowerCase().includes(needle.toLowerCase())
+
+// A theme accent painted as a truecolor SGR foreground proves which theme is live.
+function accentSgr(name: keyof typeof THEMES): string {
+  const hex = THEMES[name].accent
+  const [r, g, b] = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map((h) => parseInt(h, 16))
+  return `38;2;${r};${g};${b}`
+}
 
 const PORT = 2299
 let serverProc: ReturnType<typeof Bun.spawn>
@@ -67,7 +78,7 @@ function shell(client: Client, cols = 80, rows = 24): Promise<ClientChannel> {
 function collectUntil(
   stream: ClientChannel,
   predicate: (all: string) => boolean,
-  timeoutMs = 5000,
+  timeoutMs = 8000,
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     let all = ""
@@ -89,9 +100,10 @@ test("anonymous visitor gets the TUI with the owner's name", async () => {
   const client = await connect()
   try {
     const stream = await shell(client)
-    const frame = await collectUntil(stream, (s) => s.includes(identity.name))
-    expect(frame).toContain(identity.name)
-    expect(frame).toContain("about")
+    // the splash auto-advances to the main app after ~2s
+    const frame = await collectUntil(stream, (s) => containsCI(s, identity.name))
+    expect(containsCI(frame, identity.name)).toBe(true)
+    expect(containsCI(frame, "about")).toBe(true)
   } finally {
     client.end()
   }
@@ -101,7 +113,7 @@ test("window-change re-renders at the new width", async () => {
   const client = await connect()
   try {
     const stream = await shell(client, 80, 24)
-    await collectUntil(stream, (s) => s.includes(identity.name))
+    await collectUntil(stream, (s) => containsCI(s, identity.name))
     stream.setWindow(40, 120, 0, 0)
     // a 40-row frame positions the cursor on rows the 24-row frame never had
     await collectUntil(stream, (s) => /\[(2[5-9]|3[0-9]|40);\d+H/.test(s))
@@ -114,10 +126,23 @@ test("q ends the session with exit status 0", async () => {
   const client = await connect()
   try {
     const stream = await shell(client)
-    await collectUntil(stream, (s) => s.includes(identity.name))
+    await collectUntil(stream, (s) => containsCI(s, identity.name))
     const exitCode = new Promise<number>((resolve) => stream.on("exit", resolve))
     stream.write("q")
     expect(await exitCode).toBe(0)
+  } finally {
+    client.end()
+  }
+})
+
+test("t switches to the circuit theme live", async () => {
+  const client = await connect()
+  try {
+    const stream = await shell(client)
+    await collectUntil(stream, (s) => containsCI(s, identity.name))
+    stream.write("t")
+    // the circuit accent painted as truecolor SGR proves the repaint happened
+    await collectUntil(stream, (s) => s.includes(accentSgr("circuit")))
   } finally {
     client.end()
   }
