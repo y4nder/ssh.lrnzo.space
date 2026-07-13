@@ -17,7 +17,8 @@ const clients = new Set<Connection>()
 const server = new Server(
   {
     hostKeys: [readFileSync(HOST_KEY_PATH)],
-    ident: "SSH-2.0-ssh_portfolio",
+    // ssh2 prepends "SSH-2.0-" itself
+    ident: "ssh_portfolio",
   },
   (client, info) => {
     const ip = info.ip

@@ -51,6 +51,7 @@ jobs:
       - name: Verify the portfolio answers on port 22
         run: |
           sleep 5
-          banner=$(timeout 10 bash -c 'exec 3<>/dev/tcp/lrnzo.space/22 && head -c 64 <&3')
+          # ssh2 servers identify only after the client does, so speak first
+          banner=$(timeout 10 bash -c 'exec 3<>/dev/tcp/lrnzo.space/22 && printf "SSH-2.0-healthcheck\r\n" >&3 && head -c 32 <&3')
           echo "banner: $banner"
           echo "$banner" | grep -q "SSH-2.0-ssh_portfolio"
