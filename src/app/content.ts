@@ -32,6 +32,27 @@ export const about = {
   ],
 }
 
+export type EducationEntry = {
+  school: string
+  degree: string
+  dates: string
+  notes?: string[]
+}
+
+export const education: EducationEntry[] = [
+  {
+    school: "University of Cebu",
+    degree: "Bachelor of Science in Computer Science",
+    dates: "2022 — 2026",
+    notes: ["Magna Cum Laude", "Dean's List 2022 – 2025"],
+  },
+  {
+    school: "Misamis University",
+    degree: "STEM — Senior High School (Grades 11–12)",
+    dates: "Jun 2020 — May 2022",
+  },
+]
+
 export type ExperienceEntry = {
   company: string
   role: string

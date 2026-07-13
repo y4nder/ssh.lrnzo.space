@@ -1,11 +1,13 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { experience, honors, projects } from "./content"
 import { detailFor } from "./detail"
 import { SECTIONS, type SectionId } from "./nav"
+import { buildResumeLines, resumeRows } from "./resume"
 import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
 import { DetailView } from "./components/DetailView"
 import { Header } from "./components/Header"
+import { ResumePage } from "./components/ResumePage"
 import { Rule } from "./components/Rule"
 import { Splash } from "./components/Splash"
 import { StatusBar, type Hint } from "./components/StatusBar"
@@ -42,12 +44,28 @@ export function App({ onExit }: { onExit: () => void }) {
   // Enter on a list row expands it into a full record page; esc collapses.
   const [expanded, setExpanded] = useState(false)
   const [detailScroll, setDetailScroll] = useState(0)
+  // `r` swaps the whole frame for the CV page; esc returns to where you were.
+  const [cvOpen, setCvOpen] = useState(false)
+  const [resumeScroll, setResumeScroll] = useState(0)
 
   const theme = THEMES[themeName]
   const section = SECTIONS[sectionIdx]!
   const listCount = LIST_COUNTS[section.id]
   const record = expanded ? detailFor(section.id, cursors[section.id]) : null
   const maxScroll = record ? Math.max(0, record.paragraphs.length - 1) : 0
+
+  // The app lives in a fixed frame centered on the screen — the hierarchy
+  // converges on the middle instead of bleeding to the terminal edges.
+  const frameW = Math.min(84, width - 4)
+  const frameH = Math.min(32, height - 2)
+
+  // Full masthead only on roomy frames; the banner alone is 37x4.
+  const compact = frameW < 76 || frameH < 26
+  const headerRows = compact ? 1 : 6
+  const contentHeight = Math.max(4, frameH - headerRows - 6)
+
+  const resumeLines = useMemo(() => buildResumeLines(frameW), [frameW])
+  const resumeMaxScroll = Math.max(0, resumeLines.length - resumeRows(frameH))
 
   const collapse = () => {
     setExpanded(false)
@@ -72,6 +90,22 @@ export function App({ onExit }: { onExit: () => void }) {
     if (phase === "splash") return // Splash owns the keyboard until it finishes
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
+      return
+    }
+    // The CV page owns the keyboard while open — only scroll/theme/exit work.
+    if (cvOpen) {
+      if (key.name === "escape" || key.name === "backspace" || key.name === "r") setCvOpen(false)
+      else if (key.name === "t") setThemeName(nextTheme)
+      else if (key.name === "j" || key.name === "down")
+        setResumeScroll((s) => Math.min(resumeMaxScroll, s + 1))
+      else if (key.name === "k" || key.name === "up") setResumeScroll((s) => Math.max(0, s - 1))
+      else if (key.name === "g" && key.shift) setResumeScroll(resumeMaxScroll)
+      else if (key.name === "g") setResumeScroll(0)
+      return
+    }
+    if (key.name === "r") {
+      setResumeScroll(0)
+      setCvOpen(true)
       return
     }
     if (key.name === "escape" || key.name === "backspace") {
@@ -148,16 +182,6 @@ export function App({ onExit }: { onExit: () => void }) {
     )
   }
 
-  // The app lives in a fixed frame centered on the screen — the hierarchy
-  // converges on the middle instead of bleeding to the terminal edges.
-  const frameW = Math.min(84, width - 4)
-  const frameH = Math.min(32, height - 2)
-
-  // Full masthead only on roomy frames; the banner alone is 37x4.
-  const compact = frameW < 76 || frameH < 26
-  const headerRows = compact ? 1 : 6
-  const contentHeight = Math.max(4, frameH - headerRows - 6)
-
   const hints: Hint[] = expanded
     ? [
         { key: "j/k", label: "scroll" },
@@ -173,6 +197,9 @@ export function App({ onExit }: { onExit: () => void }) {
             ]
           : []),
         { key: "tab", label: "section" },
+        // The full bar overflows narrow frames on list sections; the landing
+        // (about) page still advertises the CV takeover.
+        ...(listCount === 0 ? [{ key: "r", label: "resume" }] : []),
         { key: "t", label: "theme" },
         { key: "q", label: "quit" },
       ]
@@ -186,40 +213,55 @@ export function App({ onExit }: { onExit: () => void }) {
         backgroundColor={theme.bg}
       >
         <box flexDirection="column" width={frameW} height={frameH}>
-          <Header compact={compact} pulseKey={section.id} />
-          <Rule heavy width={frameW} />
-          <TabBar active={section.id} width={frameW} />
-          <Rule width={frameW} />
-          <box flexGrow={1} flexDirection="column" paddingTop={1} overflow="hidden">
-            {record ? (
-              <DetailView
-                record={record}
-                height={contentHeight}
-                width={frameW}
-                scroll={detailScroll}
-              />
-            ) : (
-              <>
-                {section.id === "about" ? <About /> : null}
-                {section.id === "experience" ? (
-                  <Experience
-                    selected={cursors.experience}
+          {cvOpen ? (
+            <ResumePage
+              lines={resumeLines}
+              scroll={resumeScroll}
+              width={frameW}
+              height={frameH}
+            />
+          ) : (
+            <>
+              <Header compact={compact} pulseKey={section.id} />
+              <Rule heavy width={frameW} />
+              <TabBar active={section.id} width={frameW} />
+              <Rule width={frameW} />
+              <box flexGrow={1} flexDirection="column" paddingTop={1} overflow="hidden">
+                {record ? (
+                  <DetailView
+                    record={record}
                     height={contentHeight}
                     width={frameW}
+                    scroll={detailScroll}
                   />
-                ) : null}
-                {section.id === "projects" ? (
-                  <Projects selected={cursors.projects} height={contentHeight} width={frameW} />
-                ) : null}
-                {section.id === "honors" ? (
-                  <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
-                ) : null}
-                {section.id === "contact" ? <Contact /> : null}
-              </>
-            )}
-          </box>
-          <Rule width={frameW} />
-          <StatusBar hints={hints} right={`theme: ${theme.name} ✱`} />
+                ) : (
+                  <>
+                    {section.id === "about" ? <About /> : null}
+                    {section.id === "experience" ? (
+                      <Experience
+                        selected={cursors.experience}
+                        height={contentHeight}
+                        width={frameW}
+                      />
+                    ) : null}
+                    {section.id === "projects" ? (
+                      <Projects
+                        selected={cursors.projects}
+                        height={contentHeight}
+                        width={frameW}
+                      />
+                    ) : null}
+                    {section.id === "honors" ? (
+                      <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
+                    ) : null}
+                    {section.id === "contact" ? <Contact /> : null}
+                  </>
+                )}
+              </box>
+              <Rule width={frameW} />
+              <StatusBar hints={hints} right={`theme: ${theme.name} ✱`} />
+            </>
+          )}
         </box>
       </box>
     </ThemeContext.Provider>

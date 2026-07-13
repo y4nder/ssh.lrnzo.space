@@ -14,7 +14,7 @@ export function TabBar({ active, width }: { active: SectionId; width: number }) 
         const index = showIndex ? `N${i + 1} ` : ""
         if (isActive) {
           return (
-            <box key={s.id} backgroundColor={theme.barBg} marginRight={2}>
+            <box key={s.id} backgroundColor={theme.barBg} marginRight={showIndex ? 2 : 1}>
               <text fg={theme.barFg}>
                 {" "}
                 {index}
@@ -24,7 +24,7 @@ export function TabBar({ active, width }: { active: SectionId; width: number }) 
           )
         }
         return (
-          <box key={s.id} marginRight={2}>
+          <box key={s.id} marginRight={showIndex ? 2 : 1}>
             <text>
               {" "}
               <span fg={theme.accent}>{s.key}</span>

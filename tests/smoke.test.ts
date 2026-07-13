@@ -171,6 +171,26 @@ test(
   15000,
 )
 
+test(
+  "r swaps the frame for the CV page, G scrolls to the end, esc returns",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("r") // CV takeover: the EDUCATION heading is newly drawn
+      await collectUntil(stream, (s) => containsCI(s, "education"))
+      stream.write("G") // jump to the bottom of the document
+      await collectUntil(stream, (s) => containsCI(s, "end of document"))
+      stream.write("\x1b") // esc returns to the regular app (about redraws)
+      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
 test("exec requests are rejected", async () => {
   const client = await connect()
   try {

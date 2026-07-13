@@ -5,6 +5,33 @@ export function wrapEstimate(text: string, width: number): number {
   return Math.max(1, Math.ceil(text.length / width))
 }
 
+// Greedy word wrap returning the actual lines (wrapEstimate only counts
+// them). Words longer than the width are hard-broken so no line overflows.
+export function wrapText(text: string, width: number): string[] {
+  if (width <= 0 || text.length <= width) return [text]
+  const lines: string[] = []
+  let current = ""
+  for (const word of text.split(" ")) {
+    let piece = word
+    while (piece.length > width) {
+      if (current) {
+        lines.push(current)
+        current = ""
+      }
+      lines.push(piece.slice(0, width))
+      piece = piece.slice(width)
+    }
+    if (!current) current = piece
+    else if (current.length + 1 + piece.length <= width) current += " " + piece
+    else {
+      lines.push(current)
+      current = piece
+    }
+  }
+  if (current) lines.push(current)
+  return lines.length > 0 ? lines : [text]
+}
+
 // Fit as many items as possible into maxRows (each item costs its wrapped
 // height). When items are dropped, one row is reserved for a "+N MORE" line —
 // the total including that line NEVER exceeds maxRows, because a single
