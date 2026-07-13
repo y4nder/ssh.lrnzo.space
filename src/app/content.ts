@@ -14,8 +14,7 @@ export const identity = {
   banner: "lorenzo",
   name: "Lorenzo Lubguban",
   tagline: "software engineer",
-  // drop the -p flag once the port 22 cutover is done
-  sshCommand: "ssh -p 2222 lrnzo.space",
+  sshCommand: "ssh lrnzo.space",
 }
 
 export const about = {
