@@ -6,6 +6,7 @@
   "scripts": {
     "start": "bun src/server.ts",
     "dev": "bun --watch src/server.ts",
+    "local": "bun --watch src/local.tsx",
     "typecheck": "bunx tsc --noEmit"
   },
   "devDependencies": {
