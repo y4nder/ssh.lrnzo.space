@@ -1,5 +1,6 @@
-import { TextAttributes } from "@opentui/core"
+import { TextAttributes, type ASCIIFontName } from "@opentui/core"
 import { identity } from "../content"
+import { LRNZO_FONT } from "../lrnzoFont"
 import { useTheme } from "../theme"
 import { PulseStar } from "./PulseStar"
 
@@ -27,10 +28,10 @@ export function Header({ compact, pulseKey }: { compact: boolean; pulseKey?: unk
   return (
     <box flexDirection="column" width="100%">
       <box flexDirection="row" alignItems="flex-end">
-        <ascii-font text={identity.banner} font="block" color={theme.fg} />
+        <ascii-font text={identity.banner} font={LRNZO_FONT as ASCIIFontName} color={theme.fg} />
         <text fg={theme.accent}>.END</text>
       </box>
-      <box flexDirection="row" width="100%">
+      <box flexDirection="row" width="100%" marginTop={1}>
         <text fg={theme.dim}>
           {identity.name.toUpperCase()} — {identity.tagline.toUpperCase()}
         </text>
