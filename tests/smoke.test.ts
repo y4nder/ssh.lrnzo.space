@@ -148,6 +148,29 @@ test("t switches to the circuit theme live", async () => {
   }
 })
 
+// NOTE: OpenTUI diff-renders — only changed cells are re-emitted, so
+// predicates must match text that is NEW on screen, not chrome that partially
+// survives from the previous frame (e.g. "N2 / EXPERIENCE" reuses cells of
+// "N1 / ABOUT" and never streams contiguously).
+test(
+  "enter expands a list row into the record page",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("e") // experience section: dates column is newly drawn
+      await collectUntil(stream, (s) => containsCI(s, "JUL 2026"))
+      stream.write("\r") // expand the selected row
+      // the record-page breadcrumb suffix ("… / 01") only exists expanded
+      await collectUntil(stream, (s) => containsCI(s, "/ 01"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
 test("exec requests are rejected", async () => {
   const client = await connect()
   try {

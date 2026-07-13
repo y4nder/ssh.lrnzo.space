@@ -14,10 +14,13 @@ export function fitLines(
   items: string[],
   width: number,
   maxRows: number,
+  // Callers that render their own overflow indicator outside the budget
+  // (DetailView) pass false; inline "+N MORE" renderers keep the reserve.
+  reserveMoreRow = true,
 ): { shown: string[]; hidden: number } {
   const costs = items.map((t) => wrapEstimate(t, width))
   if (costs.reduce((a, b) => a + b, 0) <= maxRows) return { shown: items, hidden: 0 }
-  const budget = maxRows - 1 // the "+N MORE" line
+  const budget = reserveMoreRow ? maxRows - 1 : maxRows
   let used = 0
   const shown: string[] = []
   for (let i = 0; i < items.length; i++) {
@@ -25,5 +28,7 @@ export function fitLines(
     shown.push(items[i]!)
     used += costs[i]!
   }
+  // Never show nothing: a clipped first item beats an empty pane.
+  if (shown.length === 0 && items.length > 0) shown.push(items[0]!)
   return { shown, hidden: items.length - shown.length }
 }

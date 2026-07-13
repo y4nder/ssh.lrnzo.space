@@ -71,7 +71,7 @@ export function Honors({
         ))}
         {hidden > 0 ? (
           <text flexShrink={0} fg={theme.dim}>
-            … MORE
+            … MORE (ENTER)
           </text>
         ) : null}
       </box>

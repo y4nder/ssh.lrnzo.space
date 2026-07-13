@@ -12,6 +12,12 @@ export type ThemeName = "signal" | "circuit"
 // frame's glyph — but painting the default keeps the visitor's colors.
 // accentText/barFg are text ON accent blocks, so they stay explicit darks
 // that read on both the red and blue bars regardless of terminal colors.
+//
+// DARK TERMINALS ONLY (deliberate, 2026-07): fg/dim/faint assume a dark
+// background — on a light terminal the body text is near-invisible. To lift
+// this later: renderer.getPalette() OSC-queries the client terminal's
+// defaultBackground over the SSH channel; pick light/dark token variants by
+// its luminance and fall back to these dark tokens when it doesn't answer.
 export type Theme = {
   name: ThemeName
   bg: RGBA

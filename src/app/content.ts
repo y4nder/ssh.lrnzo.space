@@ -2,8 +2,8 @@
 // Rendering may uppercase strings; keep everything mixed-case here.
 
 export const identity = {
-  banner: "lorenzo",
-  name: "Lorenzo Lubguban",
+  banner: "lrnzo",
+  name: "Leander Lorenz B. Lubguban",
   tagline: "software engineer",
   host: "ssh.lrnzo.space",
   sshCommand: "ssh lrnzo.space",
@@ -11,9 +11,12 @@ export const identity = {
 
 export const about = {
   bio: [
-    "Hi, I'm Lorenzo — a software engineer from Cebu, Philippines",
-    "who likes building things end to end: backends, workflow",
-    "engines, and terminal UIs like the one you're looking at.",
+    "Hi, I'm Leander Lorenz — a software engineer from Cebu,",
+    "Philippines. I'm passionate about software development and",
+    "building awesome applications, libraries, and tools.",
+    "",
+    "I like working end to end: backends, workflow engines, and",
+    "terminal UIs like the one you're looking at.",
     "",
     "This portfolio is a TypeScript app rendered by OpenTUI and",
     "served by its own SSH server (ssh2), running in Docker on my",
@@ -83,13 +86,18 @@ export const experience: ExperienceEntry[] = [
     skills: ["NestJS", "MikroORM", "MySQL", "Redis", "Next.js", "TanStack Query", "Zustand"],
   },
   {
-    company: "SKLoud App",
+    company: "SKLoud",
     role: "Full-Stack Developer",
     dates: "Jun 2025 — May 2026",
     location: "Metro Cebu · Remote",
-    summary: "Full-stack development on a Nuxt.js + Laravel product.",
-    bullets: [],
-    skills: ["Nuxt.js", "Laravel"],
+    summary:
+      "Worked with the SKLOUD team to maintain and develop core features of their main application — used by SK youth and administrators for organizational management and communication.",
+    bullets: [
+      "Participated in monthly planning sessions and contributed to the system design of new features",
+      "Implemented usability and performance improvements across the Nuxt frontend and Laravel backend",
+      "Balanced feature development with bug fixing, keeping the application stable while it evolved to meet user needs",
+    ],
+    skills: ["Nuxt", "Laravel", "MySQL"],
   },
   {
     company: "Full Scale",
@@ -97,9 +105,14 @@ export const experience: ExperienceEntry[] = [
     type: "Internship",
     dates: "Aug 2025 — Feb 2026",
     location: "Metro Cebu · Remote",
-    summary: "Backend-focused internship building ASP.NET Web APIs.",
-    bullets: [],
-    skills: ["ASP.NET Web API", "Web Development"],
+    summary:
+      "Developed and maintained a production-grade internal web application for managing billing and rate systems.",
+    bullets: [
+      "Worked full-stack across a Blazor frontend and ASP.NET backend services",
+      "Assisted in deploying and managing application environments on Microsoft Azure, supporting CI/CD workflows and production operations",
+      "Collaborated with cross-functional teams in an Agile environment — daily scrums, task management in Jira",
+    ],
+    skills: ["Blazor", "ASP.NET", "Azure", "CI/CD", "Jira"],
   },
   {
     company: "AVSR",

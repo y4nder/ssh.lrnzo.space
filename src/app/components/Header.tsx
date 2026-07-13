@@ -1,15 +1,17 @@
 import { TextAttributes } from "@opentui/core"
 import { identity } from "../content"
 import { useTheme } from "../theme"
+import { PulseStar } from "./PulseStar"
 
 // Brutalist masthead: big ascii name with an accent ".END" suffix, dim caps
-// identity line, and registration-mark micro-labels on the right.
-export function Header({ compact }: { compact: boolean }) {
+// identity line, and registration-mark micro-labels on the right. The star
+// pulses on an idle heartbeat and whenever `pulseKey` (active tab) changes.
+export function Header({ compact, pulseKey }: { compact: boolean; pulseKey?: unknown }) {
   const theme = useTheme()
 
   if (compact) {
     return (
-      <box flexDirection="row" width="100%" height={1} flexShrink={0}>
+      <box flexDirection="row" width="100%" height={1}>
         <text>
           <span fg={theme.fg} attributes={TextAttributes.BOLD}>
             {identity.name.toUpperCase()}
@@ -23,7 +25,7 @@ export function Header({ compact }: { compact: boolean }) {
   }
 
   return (
-    <box flexDirection="column" width="100%" flexShrink={0}>
+    <box flexDirection="column" width="100%">
       <box flexDirection="row" alignItems="flex-end">
         <ascii-font text={identity.banner} font="block" color={theme.fg} />
         <text fg={theme.accent}>.END</text>
@@ -35,8 +37,8 @@ export function Header({ compact }: { compact: boolean }) {
         <box flexGrow={1} />
         <text>
           <span fg={theme.dim}>N1 N2 N3 </span>
-          <span fg={theme.accent}>✳ </span>
-          <span fg={theme.dim}>{identity.host.toUpperCase()}</span>
+          <PulseStar pulseKey={pulseKey} />
+          <span fg={theme.dim}> {identity.host.toUpperCase()}</span>
         </text>
       </box>
     </box>

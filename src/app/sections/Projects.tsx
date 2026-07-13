@@ -25,7 +25,7 @@ export function Projects({
 
   const p = projects[selected]!
   const meta = [p.dates, p.url].filter(Boolean).join(" · ")
-  const paragraphs = [p.tagline, ...p.bullets.map((b) => `✳ ${b}`)]
+  const paragraphs = [p.tagline, ...p.bullets.map((b) => `✱ ${b}`)]
   const { shown, hidden } = fitLines(paragraphs, contentWidth - 2, Math.max(1, detailRows - 4))
 
   return (
@@ -66,9 +66,9 @@ export function Projects({
         </text>
         <text flexShrink={0}> </text>
         {shown.map((line, i) =>
-          line.startsWith("✳ ") ? (
+          line.startsWith("✱ ") ? (
             <text key={i} flexShrink={0} fg={theme.fg}>
-              <span fg={theme.accent}>✳ </span>
+              <span fg={theme.accent}>✱ </span>
               {line.slice(2)}
             </text>
           ) : (
@@ -79,7 +79,7 @@ export function Projects({
         )}
         {hidden > 0 ? (
           <text flexShrink={0} fg={theme.dim}>
-            … +{hidden} MORE
+            … +{hidden} MORE (ENTER)
           </text>
         ) : null}
         <text flexShrink={0} fg={theme.dim}>

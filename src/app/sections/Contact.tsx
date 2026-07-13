@@ -22,7 +22,7 @@ export function Contact() {
       ))}
       <text flexShrink={0}> </text>
       <text flexShrink={0}>
-        <span fg={theme.accent}>✳ </span>
+        <span fg={theme.accent}>✱ </span>
         <span fg={theme.dim}>STAY CONNECTED — {identity.host.toUpperCase()}</span>
       </text>
     </box>

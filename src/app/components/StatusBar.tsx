@@ -6,8 +6,8 @@ export type Hint = { key: string; label: string }
 export function StatusBar({ hints, right }: { hints: Hint[]; right?: string }) {
   const theme = useTheme()
   return (
-    <box flexDirection="row" width="100%" height={1} flexShrink={0}>
-      <text>
+    <box flexDirection="row" width="100%" height={1} flexShrink={0} overflow="hidden">
+      <text height={1} flexShrink={1}>
         {hints.map((h, i) => (
           <span key={h.key + h.label}>
             <span fg={theme.accent}>{h.key}</span>
@@ -20,7 +20,11 @@ export function StatusBar({ hints, right }: { hints: Hint[]; right?: string }) {
         ))}
       </text>
       <box flexGrow={1} />
-      {right ? <text fg={theme.dim}>{right.toUpperCase()}</text> : null}
+      {right ? (
+        <text flexShrink={0} fg={theme.dim}>
+          {right.toUpperCase()}
+        </text>
+      ) : null}
     </box>
   )
 }

@@ -24,13 +24,13 @@ export function About() {
         <box key={skill} flexDirection="row" flexShrink={0}>
           <box width={32} flexDirection="row">
             <text fg={theme.fg}>
-              <span fg={theme.accent}>✳ </span>
+              <span fg={theme.accent}>✱ </span>
               {skill}
             </text>
           </box>
           {right[i] ? (
             <text fg={theme.fg}>
-              <span fg={theme.accent}>✳ </span>
+              <span fg={theme.accent}>✱ </span>
               {right[i]}
             </text>
           ) : null}

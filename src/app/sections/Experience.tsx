@@ -27,7 +27,7 @@ export function Experience({
   const meta = [entry.dates, entry.location, entry.type].filter(Boolean).join(" · ")
   const paragraphs = [
     ...(entry.summary ? [entry.summary] : []),
-    ...entry.bullets.map((b) => `✳ ${b}`),
+    ...entry.bullets.map((b) => `✱ ${b}`),
   ]
   // title + meta + blank + skills line stay fixed; paragraphs get the rest
   const { shown, hidden } = fitLines(paragraphs, contentWidth - 2, Math.max(1, detailRows - 4))
@@ -63,7 +63,7 @@ export function Experience({
           <span fg={theme.fg} attributes={TextAttributes.BOLD}>
             {entry.role.toUpperCase()}
           </span>
-          <span fg={theme.accent}> ✳ </span>
+          <span fg={theme.accent}> ✱ </span>
           <span fg={theme.fg}>{entry.company.toUpperCase()}</span>
         </text>
         <text flexShrink={0} fg={theme.dim}>
@@ -71,9 +71,9 @@ export function Experience({
         </text>
         <text flexShrink={0}> </text>
         {shown.map((line, i) =>
-          line.startsWith("✳ ") ? (
+          line.startsWith("✱ ") ? (
             <text key={i} flexShrink={0} fg={theme.fg}>
-              <span fg={theme.accent}>✳ </span>
+              <span fg={theme.accent}>✱ </span>
               {line.slice(2)}
             </text>
           ) : (
@@ -84,7 +84,7 @@ export function Experience({
         )}
         {hidden > 0 ? (
           <text flexShrink={0} fg={theme.dim}>
-            … +{hidden} MORE
+            … +{hidden} MORE (ENTER)
           </text>
         ) : null}
         <text flexShrink={0} fg={theme.dim}>

@@ -6,6 +6,13 @@ A terminal-UI portfolio served over SSH — the app *is* the SSH server.
 ssh lrnzo.space
 ```
 
+**Dark terminals only (for now).** The background defers to the visitor's
+terminal, but the text tokens assume a dark one — on a light terminal the
+body text is near-invisible. If this ever matters enough:
+`renderer.getPalette()` can OSC-query the client terminal's background over
+the SSH channel; branch the theme tokens on its luminance (fall back to dark
+when the terminal doesn't answer). See `src/app/theme.ts`.
+
 ## Architecture
 
 ```

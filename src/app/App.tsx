@@ -1,8 +1,10 @@
 import { useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
 import { experience, honors, projects } from "./content"
+import { detailFor } from "./detail"
 import { SECTIONS, type SectionId } from "./nav"
 import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
+import { DetailView } from "./components/DetailView"
 import { Header } from "./components/Header"
 import { Rule } from "./components/Rule"
 import { Splash } from "./components/Splash"
@@ -37,10 +39,25 @@ export function App({ onExit }: { onExit: () => void }) {
     honors: 0,
     contact: 0,
   })
+  // Enter on a list row expands it into a full record page; esc collapses.
+  const [expanded, setExpanded] = useState(false)
+  const [detailScroll, setDetailScroll] = useState(0)
 
   const theme = THEMES[themeName]
   const section = SECTIONS[sectionIdx]!
   const listCount = LIST_COUNTS[section.id]
+  const record = expanded ? detailFor(section.id, cursors[section.id]) : null
+  const maxScroll = record ? Math.max(0, record.paragraphs.length - 1) : 0
+
+  const collapse = () => {
+    setExpanded(false)
+    setDetailScroll(0)
+  }
+
+  const jumpTo = (idx: number) => {
+    collapse()
+    setSectionIdx(idx)
+  }
 
   const moveCursor = (to: (current: number) => number) => {
     if (listCount === 0) return
@@ -53,8 +70,13 @@ export function App({ onExit }: { onExit: () => void }) {
   useKeyboard((key) => {
     if (key.eventType === "release") return
     if (phase === "splash") return // Splash owns the keyboard until it finishes
-    if (key.name === "q" || key.name === "escape" || (key.ctrl && key.name === "c")) {
+    if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
+      return
+    }
+    if (key.name === "escape" || key.name === "backspace") {
+      if (expanded) collapse()
+      else onExit()
       return
     }
     if (key.name === "t") {
@@ -62,24 +84,37 @@ export function App({ onExit }: { onExit: () => void }) {
       return
     }
     if (key.name === "tab") {
-      setSectionIdx((i) => (i + (key.shift ? -1 : 1) + SECTIONS.length) % SECTIONS.length)
+      jumpTo((sectionIdx + (key.shift ? -1 : 1) + SECTIONS.length) % SECTIONS.length)
       return
     }
     if (key.name === "right") {
-      setSectionIdx((i) => (i + 1) % SECTIONS.length)
+      jumpTo((sectionIdx + 1) % SECTIONS.length)
       return
     }
     if (key.name === "left") {
-      setSectionIdx((i) => (i - 1 + SECTIONS.length) % SECTIONS.length)
+      jumpTo((sectionIdx - 1 + SECTIONS.length) % SECTIONS.length)
       return
     }
     if (key.number && SECTIONS[Number(key.name) - 1]) {
-      setSectionIdx(Number(key.name) - 1)
+      jumpTo(Number(key.name) - 1)
       return
     }
     const jump = SECTIONS.findIndex((s) => s.key === key.name && !key.shift)
     if (jump >= 0) {
-      setSectionIdx(jump)
+      jumpTo(jump)
+      return
+    }
+    if (key.name === "return") {
+      if (!expanded && listCount > 0) setExpanded(true)
+      return
+    }
+    // j/k scroll the record page when expanded, move the list cursor otherwise.
+    if (expanded) {
+      if (key.name === "j" || key.name === "down")
+        setDetailScroll((s) => Math.min(maxScroll, s + 1))
+      else if (key.name === "k" || key.name === "up") setDetailScroll((s) => Math.max(0, s - 1))
+      else if (key.name === "g" && key.shift) setDetailScroll(maxScroll)
+      else if (key.name === "g") setDetailScroll(0)
       return
     }
     if (key.name === "j" || key.name === "down") moveCursor((n) => n + 1)
@@ -123,12 +158,24 @@ export function App({ onExit }: { onExit: () => void }) {
   const headerRows = compact ? 1 : 7
   const contentHeight = Math.max(4, frameH - headerRows - 6)
 
-  const hints: Hint[] = [
-    ...(listCount > 0 ? [{ key: "j/k", label: "move" }] : []),
-    { key: "tab", label: "section" },
-    { key: "t", label: "theme" },
-    { key: "q", label: "quit" },
-  ]
+  const hints: Hint[] = expanded
+    ? [
+        { key: "j/k", label: "scroll" },
+        { key: "esc", label: "back" },
+        { key: "t", label: "theme" },
+        { key: "q", label: "quit" },
+      ]
+    : [
+        ...(listCount > 0
+          ? [
+              { key: "j/k", label: "move" },
+              { key: "enter", label: "open" },
+            ]
+          : []),
+        { key: "tab", label: "section" },
+        { key: "t", label: "theme" },
+        { key: "q", label: "quit" },
+      ]
 
   return (
     <ThemeContext.Provider value={theme}>
@@ -139,25 +186,40 @@ export function App({ onExit }: { onExit: () => void }) {
         backgroundColor={theme.bg}
       >
         <box flexDirection="column" width={frameW} height={frameH}>
-          <Header compact={compact} />
+          <Header compact={compact} pulseKey={section.id} />
           <Rule heavy width={frameW} />
           <TabBar active={section.id} width={frameW} />
           <Rule width={frameW} />
           <box flexGrow={1} flexDirection="column" paddingTop={1} overflow="hidden">
-            {section.id === "about" ? <About /> : null}
-            {section.id === "experience" ? (
-              <Experience selected={cursors.experience} height={contentHeight} width={frameW} />
-            ) : null}
-            {section.id === "projects" ? (
-              <Projects selected={cursors.projects} height={contentHeight} width={frameW} />
-            ) : null}
-            {section.id === "honors" ? (
-              <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
-            ) : null}
-            {section.id === "contact" ? <Contact /> : null}
+            {record ? (
+              <DetailView
+                record={record}
+                height={contentHeight}
+                width={frameW}
+                scroll={detailScroll}
+              />
+            ) : (
+              <>
+                {section.id === "about" ? <About /> : null}
+                {section.id === "experience" ? (
+                  <Experience
+                    selected={cursors.experience}
+                    height={contentHeight}
+                    width={frameW}
+                  />
+                ) : null}
+                {section.id === "projects" ? (
+                  <Projects selected={cursors.projects} height={contentHeight} width={frameW} />
+                ) : null}
+                {section.id === "honors" ? (
+                  <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
+                ) : null}
+                {section.id === "contact" ? <Contact /> : null}
+              </>
+            )}
           </box>
           <Rule width={frameW} />
-          <StatusBar hints={hints} right={`theme: ${theme.name} ✳`} />
+          <StatusBar hints={hints} right={`theme: ${theme.name} ✱`} />
         </box>
       </box>
     </ThemeContext.Provider>
