@@ -1,0 +1,21 @@
+services:
+  portfolio:
+    build: .
+    container_name: ssh-portfolio
+    restart: unless-stopped
+    init: true
+    ports:
+      - "2222:2222"
+    volumes:
+      # host key generated per environment, never baked into the image
+      - ./keys:/keys:ro
+    environment:
+      PORT: "2222"
+      HOST_KEY_PATH: /keys/host_key
+      MAX_SESSIONS: "30"
+    mem_limit: 512m
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
