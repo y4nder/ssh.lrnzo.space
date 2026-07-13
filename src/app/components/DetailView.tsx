@@ -1,7 +1,9 @@
 import { TextAttributes } from "@opentui/core"
 import type { DetailRecord } from "../detail"
 import { useTheme } from "../theme"
+import { useTypewriter } from "../hooks/useTypewriter"
 import { fitLines } from "../util"
+import { Cursor } from "./Cursor"
 import { Label } from "./Label"
 
 // Full-screen record page opened with enter on a list row. Paragraphs
@@ -25,7 +27,12 @@ export function DetailView({
   const chrome = 5 + (roomy ? 1 : 0) + (roomy && record.stack ? 1 : 0)
   const rows = Math.max(1, height - chrome)
   const paragraphs = record.paragraphs.slice(scroll)
-  const { shown, hidden } = fitLines(paragraphs, width - 2, rows, false)
+  // fitLines returns physical pre-wrapped lines rendered as fixed-height rows
+  // so the typewriter reveal can't reflow anything below it. crumb identifies
+  // the record (App rebuilds the record object every render); scroll as
+  // skipKey completes the text on j/k.
+  const { lines: fitted, hidden } = fitLines(paragraphs, width - 2, rows, false)
+  const { lines: typed, activeLine } = useTypewriter(fitted, record.crumb, scroll)
 
   return (
     <box flexDirection="column" width="100%">
@@ -49,18 +56,22 @@ export function DetailView({
       <text flexShrink={0} fg={theme.dim}>
         {scroll > 0 ? "↑ MORE" : " "}
       </text>
-      {shown.map((line, i) =>
-        line.startsWith("✱ ") ? (
-          <text key={scroll + i} flexShrink={0} fg={theme.fg}>
-            <span fg={theme.accent}>✱ </span>
-            {line.slice(2)}
+      {fitted.map((line, i) => {
+        const t = typed[i] ?? ""
+        return line.startsWith("✱ ") ? (
+          <text key={scroll + i} height={1} flexShrink={0} fg={theme.fg}>
+            <span fg={theme.accent}>{t.slice(0, 2)}</span>
+            {t.slice(2)}
+            {i === activeLine ? <Cursor blink={false} /> : null}
+            {t.length === 0 ? " " : null}
           </text>
         ) : (
-          <text key={scroll + i} flexShrink={0} fg={theme.fg}>
-            {line}
+          <text key={scroll + i} height={1} flexShrink={0} fg={theme.fg}>
+            {t || " "}
+            {i === activeLine ? <Cursor blink={false} /> : null}
           </text>
-        ),
-      )}
+        )
+      })}
       <text flexShrink={0} fg={theme.dim}>
         {hidden > 0 ? `↓ +${hidden} MORE` : " "}
       </text>

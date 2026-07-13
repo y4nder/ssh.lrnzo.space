@@ -1,12 +1,5 @@
-// Rough wrapped-line estimate for fitting paragraphs into a fixed-height
-// detail pane. Greedy character count is close enough for truncation math.
-export function wrapEstimate(text: string, width: number): number {
-  if (width <= 0) return 1
-  return Math.max(1, Math.ceil(text.length / width))
-}
-
-// Greedy word wrap returning the actual lines (wrapEstimate only counts
-// them). Words longer than the width are hard-broken so no line overflows.
+// Greedy word wrap returning the actual lines. Words longer than the width
+// are hard-broken so no line overflows.
 export function wrapText(text: string, width: number): string[] {
   if (width <= 0 || text.length <= width) return [text]
   const lines: string[] = []
@@ -32,11 +25,12 @@ export function wrapText(text: string, width: number): string[] {
   return lines.length > 0 ? lines : [text]
 }
 
-// Fit as many items as possible into maxRows (each item costs its wrapped
-// height). When items are dropped, one row is reserved for a "+N MORE" line —
-// the total including that line NEVER exceeds maxRows, because a single
-// overflowing row makes yoga shrink siblings to zero height and their glyphs
-// then overpaint neighboring rows.
+// Fit as many items as possible into maxRows and return their PHYSICAL
+// wrapped lines — callers render each as a fixed height={1} row, so the
+// count must be exact: one extra row overflows the frame and yoga shrinks
+// sibling rows (header, tab bar) to zero height, blanking them. When items
+// are dropped, one row is reserved for a "+N MORE" line so the total
+// including it never exceeds maxRows.
 export function fitLines(
   items: string[],
   width: number,
@@ -44,18 +38,22 @@ export function fitLines(
   // Callers that render their own overflow indicator outside the budget
   // (DetailView) pass false; inline "+N MORE" renderers keep the reserve.
   reserveMoreRow = true,
-): { shown: string[]; hidden: number } {
-  const costs = items.map((t) => wrapEstimate(t, width))
-  if (costs.reduce((a, b) => a + b, 0) <= maxRows) return { shown: items, hidden: 0 }
+): { lines: string[]; hidden: number } {
+  const wrapped = items.map((t) => wrapText(t, width))
+  if (wrapped.reduce((a, w) => a + w.length, 0) <= maxRows)
+    return { lines: wrapped.flat(), hidden: 0 }
   const budget = reserveMoreRow ? maxRows - 1 : maxRows
-  let used = 0
-  const shown: string[] = []
-  for (let i = 0; i < items.length; i++) {
-    if (used + costs[i]! > budget) break
-    shown.push(items[i]!)
-    used += costs[i]!
+  const lines: string[] = []
+  let taken = 0
+  for (const w of wrapped) {
+    if (lines.length + w.length > budget) break
+    lines.push(...w)
+    taken++
   }
   // Never show nothing: a clipped first item beats an empty pane.
-  if (shown.length === 0 && items.length > 0) shown.push(items[0]!)
-  return { shown, hidden: items.length - shown.length }
+  if (taken === 0 && items.length > 0) {
+    lines.push(...wrapped[0]!.slice(0, Math.max(1, budget)))
+    taken = 1
+  }
+  return { lines, hidden: items.length - taken }
 }

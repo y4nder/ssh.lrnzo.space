@@ -4,6 +4,8 @@ import { useTheme } from "../theme"
 import { Label } from "../components/Label"
 import { Rule } from "../components/Rule"
 import { SelectableList } from "../components/SelectableList"
+import { Cursor } from "../components/Cursor"
+import { useTypewriter } from "../hooks/useTypewriter"
 import { fitLines } from "../util"
 
 export function Honors({
@@ -24,11 +26,15 @@ export function Honors({
   const detailRows = Math.max(3, height - listBlock - 2)
 
   const h = honors[selected]!
-  const { shown, hidden } = fitLines(
+  // fitLines returns physical pre-wrapped lines rendered as fixed-height rows
+  // so the typewriter reveal can't reflow the "MORE" row; j/k changes
+  // `selected`, restarting per item.
+  const { lines: fitted, hidden } = fitLines(
     h.blurb ? [h.blurb] : [],
     contentWidth - 2,
     Math.max(1, detailRows - 3),
   )
+  const { lines: typed, activeLine } = useTypewriter(fitted, selected)
 
   return (
     <box flexDirection="column" width="100%">
@@ -64,11 +70,15 @@ export function Honors({
           {h.issuer.toUpperCase()} · {h.date.toUpperCase()}
         </text>
         <text flexShrink={0}> </text>
-        {shown.map((line, i) => (
-          <text key={i} flexShrink={0} fg={theme.fg}>
-            {line}
-          </text>
-        ))}
+        {fitted.map((line, i) => {
+          const t = typed[i] ?? ""
+          return (
+            <text key={i} height={1} flexShrink={0} fg={theme.fg}>
+              {t || " "}
+              {i === activeLine ? <Cursor blink={false} /> : null}
+            </text>
+          )
+        })}
         {hidden > 0 ? (
           <text flexShrink={0} fg={theme.dim}>
             … MORE (ENTER)
