@@ -3,6 +3,10 @@
 import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
 import { App } from "./app/App"
+import { getStore } from "./db"
+
+// dev exercises the real DB path (./data/portfolio.db unless DB_PATH is set)
+const visitorNumber = getStore().recordVisit("local")
 
 const renderer = await createCliRenderer({ exitOnCtrlC: false })
 const root = createRoot(renderer)
@@ -13,4 +17,4 @@ const exit = () => {
   process.exit(0)
 }
 
-root.render(<App onExit={exit} />)
+root.render(<App onExit={exit} ip="local" visitorNumber={visitorNumber} />)

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs"
 import { Server, type Connection } from "ssh2"
+import { getStore } from "./db"
 import { createSession, type SessionHandle } from "./session"
 
 const PORT = Number(process.env.PORT ?? 2222)
@@ -86,7 +87,8 @@ const server = new Server(
           }
 
           activeSessions++
-          log(`session open ${ip} (${activeSessions} active)`)
+          const visitorNumber = getStore().recordVisit(ip)
+          log(`session open ${ip} visitor #${visitorNumber} (${activeSessions} active)`)
 
           let cleaned = false
           const cleanup = () => {
@@ -112,7 +114,7 @@ const server = new Server(
 
           channel.on("close", cleanup)
 
-          createSession(channel, pty, log)
+          createSession(channel, pty, log, { ip, visitorNumber })
             .then((h) => {
               handle = h
               // the client may have vanished while the renderer was starting
@@ -138,6 +140,10 @@ const server = new Server(
     })
   },
 )
+
+// open the database before accepting anyone: a bad data dir (wrong owner,
+// missing mount) should crash at startup, not on the first visitor
+getStore()
 
 server.listen(PORT, BIND, () => {
   log(`ssh_portfolio listening on ${BIND}:${PORT} (max ${MAX_SESSIONS} sessions)`)

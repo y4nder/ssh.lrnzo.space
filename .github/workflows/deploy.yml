@@ -38,8 +38,9 @@ jobs:
 
       - name: Sync code
         run: |
+          # `data` holds the prod sqlite db — rsync --delete would wipe it
           rsync -az --delete \
-            --exclude node_modules --exclude keys --exclude .git --exclude .env \
+            --exclude node_modules --exclude keys --exclude data --exclude .git --exclude .env \
             -e "ssh -p $VPS_PORT" \
             ./ "$VPS_USER@$VPS_HOST:$APP_DIR/"
 

@@ -10,10 +10,15 @@ services:
     volumes:
       # host key generated per environment, never baked into the image
       - ./keys:/keys:ro
+      # sqlite (visitor counter + guestbook) survives rebuilds; the host dir
+      # must exist and be owned by uid 1000 BEFORE first start, or Docker
+      # creates it root-owned and the bun user crash-loops on EACCES
+      - ./data:/app/data
     environment:
       PORT: "2222"
       HOST_KEY_PATH: /keys/host_key
       MAX_SESSIONS: "30"
+      DB_PATH: /app/data/portfolio.db
     mem_limit: 512m
     read_only: true
     security_opt:

@@ -2,7 +2,7 @@ import { about } from "../content"
 import { useTheme } from "../theme"
 import { Label } from "../components/Label"
 
-export function About() {
+export function About({ visitorNumber }: { visitorNumber: number }) {
   const theme = useTheme()
   // Two-column skills keep the section short enough for small terminals.
   const half = Math.ceil(about.skills.length / 2)
@@ -12,6 +12,16 @@ export function About() {
   return (
     <box flexDirection="column" width="100%">
       <Label text="N1 / About" />
+      {/* greeting up top — the section bottom clips on short terminals */}
+      {visitorNumber > 0 ? (
+        <text flexShrink={0}>
+          <span fg={theme.accent}>✱ </span>
+          <span fg={theme.dim}>
+            YOU ARE VISITOR N{String(visitorNumber).padStart(4, "0")} · PRESS B FOR THE
+            GUESTBOOK
+          </span>
+        </text>
+      ) : null}
       <text flexShrink={0}> </text>
       {about.bio.map((line, i) => (
         <text key={i} flexShrink={0} fg={theme.fg}>

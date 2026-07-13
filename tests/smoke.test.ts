@@ -12,6 +12,10 @@ import { THEMES } from "../src/app/theme"
 // The UI renders copy in ALL CAPS, so predicates must be case-insensitive.
 const containsCI = (all: string, needle: string) => all.toLowerCase().includes(needle.toLowerCase())
 
+// Rows mix colored spans, so SGR codes interleave mid-string ("CI-GUEST"
+// then \x1b[…m then " · 2026-…"); strip them before matching across spans.
+const stripAnsi = (all: string) => all.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
+
 // A theme accent painted as a truecolor SGR foreground proves which theme is live.
 function accentSgr(name: keyof typeof THEMES): string {
   const hex = THEMES[name].accent
@@ -36,6 +40,8 @@ beforeAll(async () => {
       BIND: "127.0.0.1",
       HOST_KEY_PATH: keyPath,
       IDLE_TIMEOUT_MS: "30000",
+      // scratch database — tests must never touch ./data
+      DB_PATH: join(tmpDir, "test.db"),
     },
     stdout: "pipe",
   })
@@ -184,6 +190,63 @@ test(
       await collectUntil(stream, (s) => containsCI(s, "end of document"))
       stream.write("\x1b") // esc returns to the regular app (about redraws)
       await collectUntil(stream, (s) => containsCI(s, "passionate"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test("the about page shows this session's visitor number", async () => {
+  const client = await connect()
+  try {
+    const stream = await shell(client)
+    // don't assert the exact number — every test connection increments it
+    await collectUntil(stream, (s) => /VISITOR N\d+/i.test(s))
+  } finally {
+    client.end()
+  }
+})
+
+test(
+  "b opens the guestbook and the compose flow stores a message",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("b") // guestbook takeover: header is newly drawn
+      await collectUntil(stream, (s) => containsCI(s, "guestbook"))
+      stream.write("n") // compose form
+      await collectUntil(stream, (s) => containsCI(s, "name (optional)"))
+      stream.write("ci-guest\r") // name, enter advances to message
+      stream.write("hello from the smoke test\r") // message, enter submits
+      // the message text already streamed as compose-field echo, so match the
+      // entry META line — "name · date" only exists in the browse list
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "ci-guest ·"))
+      stream.write("\x1b") // esc returns to the regular app (about redraws)
+      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "a second entry from the same ip is rate limited",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("b")
+      await collectUntil(stream, (s) => containsCI(s, "guestbook"))
+      stream.write("n")
+      await collectUntil(stream, (s) => containsCI(s, "name (optional)"))
+      stream.write("\r") // skip the name field
+      stream.write("second attempt\r")
+      await collectUntil(stream, (s) => containsCI(s, "rate limited"))
     } finally {
       client.end()
     }

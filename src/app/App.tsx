@@ -6,6 +6,7 @@ import { SECTIONS, type SectionId } from "./nav"
 import { buildResumeLines, resumeRows } from "./resume"
 import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
 import { DetailView } from "./components/DetailView"
+import { GuestbookPage } from "./components/GuestbookPage"
 import { Header } from "./components/Header"
 import { ResumePage } from "./components/ResumePage"
 import { Rule } from "./components/Rule"
@@ -29,7 +30,15 @@ const LIST_COUNTS: Record<SectionId, number> = {
   contact: 0,
 }
 
-export function App({ onExit }: { onExit: () => void }) {
+export function App({
+  onExit,
+  ip,
+  visitorNumber,
+}: {
+  onExit: () => void
+  ip: string
+  visitorNumber: number
+}) {
   const { width, height } = useTerminalDimensions()
   const [themeName, setThemeName] = useState<ThemeName>("signal")
   const [phase, setPhase] = useState<"splash" | "main">("splash")
@@ -47,6 +56,8 @@ export function App({ onExit }: { onExit: () => void }) {
   // `r` swaps the whole frame for the CV page; esc returns to where you were.
   const [cvOpen, setCvOpen] = useState(false)
   const [resumeScroll, setResumeScroll] = useState(0)
+  // `b` swaps the whole frame for the guestbook, same takeover pattern.
+  const [gbOpen, setGbOpen] = useState(false)
 
   const theme = THEMES[themeName]
   const section = SECTIONS[sectionIdx]!
@@ -88,6 +99,9 @@ export function App({ onExit }: { onExit: () => void }) {
   useKeyboard((key) => {
     if (key.eventType === "release") return
     if (phase === "splash") return // Splash owns the keyboard until it finishes
+    // The guestbook owns the keyboard entirely — this guard must stay ABOVE
+    // the quit check: in compose mode `q` and digits are message text.
+    if (gbOpen) return
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
       return
@@ -106,6 +120,10 @@ export function App({ onExit }: { onExit: () => void }) {
     if (key.name === "r") {
       setResumeScroll(0)
       setCvOpen(true)
+      return
+    }
+    if (key.name === "b") {
+      setGbOpen(true)
       return
     }
     if (key.name === "escape" || key.name === "backspace") {
@@ -198,8 +216,11 @@ export function App({ onExit }: { onExit: () => void }) {
           : []),
         { key: "tab", label: "section" },
         // The full bar overflows narrow frames on list sections; the landing
-        // (about) page still advertises the CV takeover.
+        // (about) page still advertises the CV takeover. The guestbook hint
+        // needs a few more columns, so it only shows on roomy frames — About
+        // itself advertises it in the visitor line.
         ...(listCount === 0 ? [{ key: "r", label: "resume" }] : []),
+        ...(listCount === 0 && frameW >= 72 ? [{ key: "b", label: "guestbook" }] : []),
         { key: "t", label: "theme" },
         { key: "q", label: "quit" },
       ]
@@ -213,7 +234,16 @@ export function App({ onExit }: { onExit: () => void }) {
         backgroundColor={theme.bg}
       >
         <box flexDirection="column" width={frameW} height={frameH}>
-          {cvOpen ? (
+          {gbOpen ? (
+            <GuestbookPage
+              ip={ip}
+              width={frameW}
+              height={frameH}
+              onClose={() => setGbOpen(false)}
+              onExit={onExit}
+              onToggleTheme={() => setThemeName(nextTheme)}
+            />
+          ) : cvOpen ? (
             <ResumePage
               lines={resumeLines}
               scroll={resumeScroll}
@@ -236,7 +266,7 @@ export function App({ onExit }: { onExit: () => void }) {
                   />
                 ) : (
                   <>
-                    {section.id === "about" ? <About /> : null}
+                    {section.id === "about" ? <About visitorNumber={visitorNumber} /> : null}
                     {section.id === "experience" ? (
                       <Experience
                         selected={cursors.experience}

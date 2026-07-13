@@ -14,6 +14,7 @@ export async function createSession(
   channel: ServerChannel,
   pty: { cols: number; rows: number },
   onLog: (msg: string) => void,
+  meta: { ip: string; visitorNumber: number },
 ): Promise<SessionHandle> {
   const stream = asTtyChannel(channel, pty.cols, pty.rows)
 
@@ -56,7 +57,7 @@ export async function createSession(
   }
 
   root = createRoot(renderer)
-  root.render(createElement(App, { onExit: exit }))
+  root.render(createElement(App, { onExit: exit, ip: meta.ip, visitorNumber: meta.visitorNumber }))
 
   channel.on("close", destroy)
   channel.on("error", destroy)
