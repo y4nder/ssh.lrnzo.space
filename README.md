@@ -3,14 +3,13 @@
 A terminal-UI portfolio served over SSH — the app *is* the SSH server.
 
 ```
-ssh <domain>        # once port 22 cutover is done
-ssh -p 2222 <vps>   # today
+ssh lrnzo.space
 ```
 
 ## Architecture
 
 ```
-visitor ──ssh──> :2222
+visitor ──ssh──> :22 (container listens on 2222 internally)
                   │
         Bun process (Docker, non-root, 512MB cap)
                   │
@@ -70,9 +69,16 @@ volume-mounted read-only; it must be owned by uid 1000 (the container's
 non-root `bun` user). Regenerating it would show visitors a scary
 host-key-changed warning — don't.
 
-## Port 22 cutover (pending)
+## VPS SSH layout (since 2026-07-13 cutover)
 
-Staged, zero-break-window plan: admin sshd adds port 2200 alongside 22 →
-local `~/.ssh/config` and the faculytics CI port secret move to 2200 → test
-deploy confirms green → sshd drops 22 → this container publishes 22.
-Details in the project plan.
+- **Port 22** — this portfolio (`ssh lrnzo.space`), docker-published.
+- **Port 2200** — admin sshd (`Host yander_vps` in `~/.ssh/config`), key-only:
+  password auth and root password login are disabled
+  (`/etc/ssh/sshd_config.d/49-hardening.conf`; the `49-` prefix outranks
+  cloud-init's `50-` because sshd takes the first value it sees).
+- sshd runs as a classic `ssh.service` — socket activation was disabled
+  because `ssh.socket`'s ListenStream overrides `Port` directives on
+  Ubuntu 24.04.
+- The faculytics CI pipeline still points at port 22 and will fail on its
+  next run (project parked; deliberate). Fix = change its SSH port secret
+  to 2200.
