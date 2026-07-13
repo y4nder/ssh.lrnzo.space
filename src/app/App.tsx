@@ -153,9 +153,9 @@ export function App({ onExit }: { onExit: () => void }) {
   const frameW = Math.min(84, width - 4)
   const frameH = Math.min(32, height - 2)
 
-  // Full masthead only on roomy frames; the banner alone is 66x6.
+  // Full masthead only on roomy frames; the banner alone is 37x4.
   const compact = frameW < 76 || frameH < 26
-  const headerRows = compact ? 1 : 7
+  const headerRows = compact ? 1 : 6
   const contentHeight = Math.max(4, frameH - headerRows - 6)
 
   const hints: Hint[] = expanded
