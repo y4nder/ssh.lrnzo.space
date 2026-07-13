@@ -1,0 +1,56 @@
+name: test & deploy
+
+on:
+  push:
+
+env:
+  VPS_HOST: 185.201.9.190
+  VPS_PORT: "2200"
+  VPS_USER: deploy
+  APP_DIR: /opt/ssh-portfolio
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun test
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # pinned host key of the VPS admin sshd (port 2200)
+          echo "[185.201.9.190]:2200 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK9JFFjVBTdJfnEEfSwrS0Q/AY6751+lJoRa9IRyN3m+" >> ~/.ssh/known_hosts
+
+      - name: Sync code
+        run: |
+          rsync -az --delete \
+            --exclude node_modules --exclude keys --exclude .git --exclude .env \
+            -e "ssh -p $VPS_PORT" \
+            ./ "$VPS_USER@$VPS_HOST:$APP_DIR/"
+
+      - name: Rebuild and restart
+        run: |
+          ssh -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" \
+            "cd $APP_DIR && docker compose up -d --build"
+
+      - name: Verify the portfolio answers on port 22
+        run: |
+          sleep 5
+          banner=$(timeout 10 bash -c 'exec 3<>/dev/tcp/lrnzo.space/22 && head -c 64 <&3')
+          echo "banner: $banner"
+          echo "$banner" | grep -q "SSH-2.0-ssh_portfolio"
