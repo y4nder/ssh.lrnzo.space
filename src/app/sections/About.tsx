@@ -13,13 +13,16 @@ export function About({ visitorNumber }: { visitorNumber: number }) {
   const left = about.skills.slice(0, half)
   const right = about.skills.slice(half)
 
-  // One character budget covers the bio and the skill grid: the bio types
-  // char-by-char, then each skill row pops in whole once its share of the
-  // budget is spent — row text is in the array only for its length, so the
-  // accent ✱ spans never get sliced mid-span. About remounts on nav, so the
-  // constant resetKey retypes per visit like the list previews do.
+  // One character budget covers the bio, the Capabilities label, and the
+  // skill grid: the bio and label type char-by-char, then each skill row pops
+  // in whole once its share of the budget is spent — row text is in the array
+  // only for its length, so the accent ✱ spans never get sliced mid-span.
+  // About remounts on nav, so the constant resetKey retypes per visit like
+  // the list previews do.
   const rows = left.map((skill, i) => skill + (right[i] ?? ""))
-  const lines = [...about.bio, "", ...rows]
+  const label = "CAPABILITIES"
+  const labelLine = about.bio.length + 1
+  const lines = [...about.bio, "", label, ...rows]
   const { lines: typed, activeLine } = useTypewriter(lines, 0)
 
   return (
@@ -44,9 +47,13 @@ export function About({ visitorNumber }: { visitorNumber: number }) {
         </text>
       ))}
       <text flexShrink={0}> </text>
-      <Label text="Capabilities" accent />
+      {/* the label types too — a static Label floats while the rest animates */}
+      <text height={1} flexShrink={0} fg={theme.accent}>
+        {typed[labelLine] || " "}
+        {labelLine === activeLine ? <Cursor blink={false} /> : null}
+      </text>
       {left.map((skill, i) => {
-        const li = about.bio.length + 1 + i
+        const li = labelLine + 1 + i
         const rowDone = typed[li] === rows[i]
         return (
           <box key={skill} flexDirection="row" flexShrink={0} height={1}>
