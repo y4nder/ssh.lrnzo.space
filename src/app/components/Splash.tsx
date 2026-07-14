@@ -59,7 +59,7 @@ export function Splash({ onDone, onExit }: { onDone: () => void; onExit: () => v
           <Cursor blink={typed} />
         </text>
         <text> </text>
-        <text fg={theme.dim}>{typed ? "PRESS ANY KEY" : " "}</text>
+        {/* <text fg={theme.dim}>{typed ? "PRESS ANY KEY" : " "}</text> */}
       </box>
     </box>
   )
