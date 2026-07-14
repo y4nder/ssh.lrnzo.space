@@ -12,6 +12,7 @@ import {
   promptFor,
   type ConsoleCtx,
 } from "../src/app/console"
+import { QR_HEIGHT } from "../src/app/qr"
 
 const ctx = (over: Partial<ConsoleCtx> = {}): ConsoleCtx => ({
   ip: "203.0.113.7",
@@ -19,6 +20,7 @@ const ctx = (over: Partial<ConsoleCtx> = {}): ConsoleCtx => ({
   online: 3,
   cwd: "~",
   history: [],
+  theme: "signal",
   ...over,
 })
 
@@ -65,6 +67,18 @@ describe("execute", () => {
     expect(texts(execute("skills", ctx()))).toContain("TypeScript")
     expect(texts(execute("contact", ctx()))).toContain("lorenzolubguban@gmail.com")
     expect(texts(execute("about", ctx()))).toContain("Leander")
+  })
+
+  test("qr prints the accent module grid with a scan caption", () => {
+    const r = execute("qr", ctx())
+    expect(r.lines.length).toBe(QR_HEIGHT + 1)
+    expect(r.lines[1]!.text).toContain("█▀▀▀▀▀█") // finder pattern row
+    expect(r.lines[1]!.style).toBe("accent")
+    // every module row fits the min console width — wrapText must pass
+    // them through untouched or the grid shreds
+    for (const l of r.lines.slice(0, -1)) expect(l.text.length).toBeLessThanOrEqual(29)
+    expect(r.lines.at(-1)!.text).toContain("linkedin.com/in/y4nder")
+    expect(r.lines.at(-1)!.style).toBe("dim")
   })
 
   test("echo repeats its arguments", () => {
@@ -149,6 +163,29 @@ describe("effects", () => {
       expect(r.effect).toBe("exit")
       expect(texts(r)).toBe("logout")
     }
+  })
+
+  test("theme with no args reports current and available", () => {
+    const out = texts(execute("theme", ctx()))
+    expect(out).toContain("current: signal")
+    expect(out).toContain("available: signal, circuit")
+    expect(out).toContain("usage: theme <name>")
+  })
+
+  test("theme <name> returns the switch for App to apply", () => {
+    const r = execute("theme circuit", ctx())
+    expect(r.theme).toBe("circuit")
+    expect(texts(r)).toContain("theme → circuit")
+    expect(r.lines[0]!.style).toBe("accent")
+  })
+
+  test("theme rejects unknown names and no-ops on the current one", () => {
+    const bad = execute("theme neon", ctx())
+    expect(bad.theme).toBeUndefined()
+    expect(texts(bad)).toContain("no such theme: neon")
+    const same = execute("theme signal", ctx())
+    expect(same.theme).toBeUndefined()
+    expect(texts(same)).toContain("already on signal")
   })
 
   test("history dumps ctx history numbered", () => {

@@ -13,7 +13,7 @@ import {
   type OutStyle,
 } from "../console"
 import { identity } from "../content"
-import { useTheme } from "../theme"
+import { useTheme, type ThemeName } from "../theme"
 import { usePresence } from "../hooks/usePresence"
 import { useTypewriter } from "../hooks/useTypewriter"
 import { wrapText } from "../util"
@@ -53,6 +53,7 @@ export function ConsolePage({
   session,
   onSession,
   onClose,
+  onTheme,
 }: {
   ip: string
   visitorNumber: number
@@ -61,6 +62,7 @@ export function ConsolePage({
   session: ConsoleSession
   onSession: (update: (s: ConsoleSession) => ConsoleSession) => void
   onClose: () => void
+  onTheme: (name: ThemeName) => void
 }) {
   const theme = useTheme()
   const online = usePresence()
@@ -116,7 +118,14 @@ export function ConsolePage({
     const trimmed = raw.trim()
     const echo: ConsoleEntry = { kind: "input", text: `${prompt} ${raw}`.trimEnd() }
     const res = trimmed
-      ? execute(trimmed, { ip, visitorNumber, online, cwd: session.cwd, history: session.history })
+      ? execute(trimmed, {
+          ip,
+          visitorNumber,
+          online,
+          cwd: session.cwd,
+          history: session.history,
+          theme: theme.name,
+        })
       : null
     onSession((s) => {
       const entries =
@@ -140,6 +149,7 @@ export function ConsolePage({
     histNav.current = { idx: null, draft: "" }
     setSt({ value: "", submit: false })
     setScrollUp(0) // new output pins the window back to the bottom
+    if (res?.theme) onTheme(res.theme)
     if (res?.effect === "exit") onClose() // the logout line lands in persisted scrollback first
   }, [st.submit])
 

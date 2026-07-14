@@ -266,6 +266,7 @@ export function App({
               session={consoleSession}
               onSession={setConsoleSession}
               onClose={() => setConsoleOpen(false)}
+              onTheme={setThemeName}
             />
           ) : gbOpen ? (
             <GuestbookPage

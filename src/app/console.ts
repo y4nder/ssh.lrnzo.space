@@ -5,6 +5,8 @@
 // nothing in the visible UI ever mentions this file exists.
 import { getStore } from "../db"
 import { about, contact, experience, identity, projects } from "./content"
+import { QR_ROWS } from "./qr"
+import { THEMES, type ThemeName } from "./theme"
 
 export type OutStyle = "fg" | "dim" | "accent" | "error"
 export type OutLine = { text: string; style?: OutStyle }
@@ -32,12 +34,14 @@ export type ConsoleCtx = {
   online: number
   cwd: string
   history: string[]
+  theme: ThemeName
 }
 
 export type ExecResult = {
   lines: OutLine[]
   effect?: "exit" | "clear"
   cwd?: string
+  theme?: ThemeName
 }
 
 export const HISTORY_MAX = 50
@@ -321,6 +325,18 @@ const COMMANDS: Command[] = [
     }),
   },
   {
+    name: "qr",
+    summary: "linkedin, for your phone",
+    run: () => ({
+      // Rows ≤29 chars never re-wrap (wrapText passes short lines through),
+      // so the module grid survives the scrollback reflow intact.
+      lines: [
+        ...QR_ROWS.map((text) => ({ text, style: "accent" }) as OutLine),
+        { text: `  scan → ${contact.linkedin}`, style: "dim" },
+      ],
+    }),
+  },
+  {
     name: "ls",
     summary: "look around",
     run: (args, ctx) => {
@@ -380,6 +396,29 @@ const COMMANDS: Command[] = [
     name: "echo",
     summary: "say it back",
     run: (args) => ({ lines: [{ text: args.join(" ") }] }),
+  },
+  {
+    name: "theme",
+    summary: "repaint the shell",
+    run: (args, ctx) => {
+      const names = Object.keys(THEMES) as ThemeName[]
+      const arg = args[0]?.toLowerCase()
+      if (!arg)
+        return {
+          lines: [
+            { text: `current: ${ctx.theme}` },
+            { text: `available: ${names.join(", ")}`, style: "dim" },
+            { text: "usage: theme <name>", style: "dim" },
+          ],
+        }
+      if (!names.includes(arg as ThemeName))
+        return { lines: err(`theme: no such theme: ${arg}`) }
+      if (arg === ctx.theme)
+        return { lines: [{ text: `already on ${arg}`, style: "dim" }] }
+      // The confirmation paints in the NEW accent — the state flip and this
+      // line land in the same commit.
+      return { theme: arg as ThemeName, lines: [{ text: `theme → ${arg}`, style: "accent" }] }
+    },
   },
   {
     name: "clear",
