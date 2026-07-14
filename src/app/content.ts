@@ -303,3 +303,12 @@ export const contact = {
   linkedin: "linkedin.com/in/y4nder",
   ssh: "ssh lrnzo.space",
 }
+
+// What lands in the clipboard when a contact row is yanked — links paste
+// ready-to-open, everything else copies as displayed.
+export const contactCopy = {
+  email: contact.email,
+  github: `https://${contact.github}`,
+  linkedin: `https://${contact.linkedin}`,
+  ssh: contact.ssh,
+}

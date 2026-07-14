@@ -247,13 +247,24 @@ export function App({
               { key: "enter", label: "open" },
             ]
           : []),
+        // Contact runs its own selection/yank keys; its hints replace the
+        // r/b ones so the bar still fits narrow frames — About advertises
+        // both takeovers anyway.
+        ...(section.id === "contact"
+          ? [
+              { key: "j/k", label: "move" },
+              { key: "y", label: "copy" },
+            ]
+          : []),
         { key: "tab", label: "section" },
         // The full bar overflows narrow frames on list sections; the landing
         // (about) page still advertises the CV takeover. The guestbook hint
         // needs a few more columns, so it only shows on roomy frames — About
         // itself advertises it in the visitor line.
-        ...(listCount === 0 ? [{ key: "r", label: "resume" }] : []),
-        ...(listCount === 0 && frameW >= 72 ? [{ key: "b", label: "guestbook" }] : []),
+        ...(listCount === 0 && section.id !== "contact" ? [{ key: "r", label: "resume" }] : []),
+        ...(listCount === 0 && section.id !== "contact" && frameW >= 72
+          ? [{ key: "b", label: "guestbook" }]
+          : []),
         { key: "t", label: "theme" },
         { key: "q", label: "quit" },
       ]

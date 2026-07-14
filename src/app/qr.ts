@@ -1,10 +1,10 @@
 import QRCode from "qrcode"
-import { contact } from "./content"
+import { contactCopy } from "./content"
 
 // Lowercase is required — the LinkedIn path is case-sensitive (/IN/Y4NDER
 // doesn't resolve). Byte mode at level L keeps version 2 (25×25); level M
 // would force version 3 and a bigger footprint.
-const QR_TEXT = `https://${contact.linkedin}`
+const QR_TEXT = contactCopy.linkedin
 const QUIET = 2 // quiet-zone modules baked into the strings
 
 const qr = QRCode.create(QR_TEXT, { errorCorrectionLevel: "L" })
