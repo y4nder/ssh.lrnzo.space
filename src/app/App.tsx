@@ -317,7 +317,9 @@ export function App({
                     {section.id === "honors" ? (
                       <Honors selected={cursors.honors} height={contentHeight} width={frameW} />
                     ) : null}
-                    {section.id === "contact" ? <Contact /> : null}
+                    {section.id === "contact" ? (
+                      <Contact width={frameW} height={contentHeight} />
+                    ) : null}
                   </>
                 )}
               </box>
