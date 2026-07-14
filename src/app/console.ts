@@ -115,7 +115,7 @@ const FS: Record<string, FsNode> = {
     kind: "file",
     lines: [
       "ok, you earned this:",
-      "- the theme toggle has exactly two themes because i couldn't pick.",
+      "- the theme toggle had exactly two themes because i couldn't pick. now there are three. still can't pick.",
       "- the visitor counter counts you every time. yes, you're inflating it.",
       "- there is no deeper level. this is the bottom.",
     ],
