@@ -103,8 +103,8 @@ export function Contact({ width, height }: { width: number; height: number }) {
           {rows.map(([label], i) => {
             const t = typed[i] ?? ""
             // Selection keeps the original text colors readable: an accent
-            // edge mark + faint row tint instead of the full accent bar
-            // (dim-on-accent failed contrast on every theme).
+            // edge mark instead of a background bar (dim-on-accent failed
+            // contrast on every theme).
             return (
               <box
                 key={label}
@@ -113,7 +113,6 @@ export function Contact({ width, height }: { width: number; height: number }) {
                 height={1}
                 overflow="hidden"
                 flexShrink={0}
-                backgroundColor={i === selected ? theme.faint : undefined}
               >
                 <text height={1} flexShrink={0} fg={theme.accent}>
                   {i === selected ? "▌ " : "  "}
