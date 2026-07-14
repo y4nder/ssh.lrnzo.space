@@ -280,6 +280,71 @@ test(
   15000,
 )
 
+test(
+  "` opens the hidden console; commands run; exit returns to the app",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      // the boot banner types out in small chunks with SGR/cursor codes
+      // between them, so console predicates must match the STRIPPED stream
+      stream.write("`") // hidden console takeover: boot banner is newly drawn
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "guest shell"))
+      stream.write("whoami\r")
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "visitor #"))
+      stream.write("sudo rm -rf /\r") // the bit must stay a bit
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "just kidding"))
+      stream.write("exit\r") // the exit command closes the console too
+      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "esc closes the console back to the app",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("`")
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "guest shell"))
+      stream.write("\x1b") // esc returns to the regular app (about redraws)
+      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "a backtick typed in guestbook compose is text, not the console trigger",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("b")
+      await collectUntil(stream, (s) => containsCI(s, "guestbook"))
+      stream.write("n")
+      await collectUntil(stream, (s) => containsCI(s, "name (optional)"))
+      // the backtick must land in the name field (no submit — stays
+      // rate-limit-free) and must NOT swap the frame for the console
+      stream.write("tick`tock")
+      const all = await collectUntil(stream, (s) => containsCI(stripAnsi(s), "tick`tock"))
+      expect(containsCI(stripAnsi(all), "guest shell")).toBe(false)
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
 test("exec requests are rejected", async () => {
   const client = await connect()
   try {

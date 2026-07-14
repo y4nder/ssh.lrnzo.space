@@ -4,7 +4,9 @@ import { experience, honors, projects } from "./content"
 import { detailFor } from "./detail"
 import { SECTIONS, type SectionId } from "./nav"
 import { buildResumeLines, resumeRows } from "./resume"
+import { type ConsoleSession } from "./console"
 import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
+import { ConsolePage } from "./components/ConsolePage"
 import { DetailView } from "./components/DetailView"
 import { GuestbookPage } from "./components/GuestbookPage"
 import { Header } from "./components/Header"
@@ -60,6 +62,16 @@ export function App({
   const [resumeScroll, setResumeScroll] = useState(0)
   // `b` swaps the whole frame for the guestbook, same takeover pattern.
   const [gbOpen, setGbOpen] = useState(false)
+  // ` (backtick) opens the hidden console — deliberately absent from every
+  // hint bar. Scrollback/history/cwd live here so they survive close/reopen
+  // for the whole SSH session (ConsolePage remounts on each open).
+  const [consoleOpen, setConsoleOpen] = useState(false)
+  const [consoleSession, setConsoleSession] = useState<ConsoleSession>({
+    entries: [],
+    history: [],
+    cwd: "~",
+    booted: false,
+  })
 
   const theme = THEMES[themeName]
   const section = SECTIONS[sectionIdx]!
@@ -104,6 +116,8 @@ export function App({
     // The guestbook owns the keyboard entirely — this guard must stay ABOVE
     // the quit check: in compose mode `q` and digits are message text.
     if (gbOpen) return
+    // Same for the console: `q` and everything else is prompt text.
+    if (consoleOpen) return
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
       return
@@ -126,6 +140,13 @@ export function App({
     }
     if (key.name === "b") {
       setGbOpen(true)
+      return
+    }
+    // The hidden console. The opening ` can't leak into its prompt: the
+    // input only mounts on the re-render after this handler returns.
+    if (key.name === "`") {
+      key.preventDefault()
+      setConsoleOpen(true)
       return
     }
     if (key.name === "escape" || key.name === "backspace") {
@@ -236,7 +257,17 @@ export function App({
         backgroundColor={theme.bg}
       >
         <box flexDirection="column" width={frameW} height={frameH}>
-          {gbOpen ? (
+          {consoleOpen ? (
+            <ConsolePage
+              ip={ip}
+              visitorNumber={visitorNumber}
+              width={frameW}
+              height={frameH}
+              session={consoleSession}
+              onSession={setConsoleSession}
+              onClose={() => setConsoleOpen(false)}
+            />
+          ) : gbOpen ? (
             <GuestbookPage
               ip={ip}
               width={frameW}
