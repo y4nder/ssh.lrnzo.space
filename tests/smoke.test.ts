@@ -296,3 +296,40 @@ test("exec requests are rejected", async () => {
     client.end()
   }
 })
+
+test(
+  "presence count live-updates across sessions and drops on disconnect",
+  async () => {
+    const watcher = await connect()
+    try {
+      const watcherStream = await shell(watcher)
+      await collectUntil(watcherStream, (s) => containsCI(s, identity.name))
+
+      // Attach the predicate BEFORE the second session exists — the About
+      // line inserts " · 2 ONLINE" mid-string, so the shifted tail streams
+      // contiguously (see the diff-render NOTE above).
+      const sawTwo = collectUntil(watcherStream, (s) => containsCI(stripAnsi(s), "2 ONLINE"))
+      const second = await connect()
+      const secondStream = await shell(second)
+      await collectUntil(secondStream, (s) => containsCI(s, identity.name))
+      await sawTwo
+
+      // Drop the second session; a third connect must land back on 2, not
+      // 3 — proving leave() paired with the disconnect.
+      second.end()
+      await Bun.sleep(500)
+      const sawTwoAgain = collectUntil(watcherStream, (s) => {
+        const tail = stripAnsi(s)
+        return tail.includes("2 ONLINE") && !tail.includes("3 ONLINE")
+      })
+      const third = await connect()
+      const thirdStream = await shell(third)
+      await collectUntil(thirdStream, (s) => containsCI(s, identity.name))
+      await sawTwoAgain
+      third.end()
+    } finally {
+      watcher.end()
+    }
+  },
+  20000,
+)

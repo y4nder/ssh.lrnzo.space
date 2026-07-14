@@ -3,6 +3,7 @@ import { createRoot, type Root } from "@opentui/react"
 import type { ServerChannel } from "ssh2"
 import { createElement } from "react"
 import { App } from "./app/App"
+import { join, leave } from "./presence"
 import { asTtyChannel } from "./tty-stream"
 
 export type SessionHandle = {
@@ -35,6 +36,7 @@ export async function createSession(
   const destroy = () => {
     if (destroyed) return
     destroyed = true
+    leave()
     try {
       root?.unmount()
     } catch (err) {
@@ -56,6 +58,9 @@ export async function createSession(
     } catch {}
   }
 
+  // join only once the renderer is up: every earlier failure path skips
+  // destroy(), and join/leave must pair exactly.
+  join()
   root = createRoot(renderer)
   root.render(createElement(App, { onExit: exit, ip: meta.ip, visitorNumber: meta.visitorNumber }))
 

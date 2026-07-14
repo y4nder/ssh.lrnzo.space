@@ -13,6 +13,7 @@ import { Rule } from "./components/Rule"
 import { Splash } from "./components/Splash"
 import { StatusBar, type Hint } from "./components/StatusBar"
 import { TabBar } from "./components/TabBar"
+import { usePresence } from "./hooks/usePresence"
 import { About } from "./sections/About"
 import { Contact } from "./sections/Contact"
 import { Experience } from "./sections/Experience"
@@ -40,6 +41,7 @@ export function App({
   visitorNumber: number
 }) {
   const { width, height } = useTerminalDimensions()
+  const online = usePresence()
   const [themeName, setThemeName] = useState<ThemeName>("signal")
   const [phase, setPhase] = useState<"splash" | "main">("splash")
   const [sectionIdx, setSectionIdx] = useState(0)
@@ -289,7 +291,16 @@ export function App({
                 )}
               </box>
               <Rule width={frameW} />
-              <StatusBar hints={hints} right={`theme: ${theme.name} ✱`} />
+              <StatusBar
+                hints={hints}
+                // presence only on roomy frames: hints already crowd the
+                // bar at min width and the right text never shrinks
+                right={
+                  compact
+                    ? `theme: ${theme.name} ✱`
+                    : `${online} online · theme: ${theme.name} ✱`
+                }
+              />
             </>
           )}
         </box>

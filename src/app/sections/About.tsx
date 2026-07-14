@@ -1,9 +1,11 @@
 import { about } from "../content"
 import { useTheme } from "../theme"
 import { Label } from "../components/Label"
+import { usePresence } from "../hooks/usePresence"
 
 export function About({ visitorNumber }: { visitorNumber: number }) {
   const theme = useTheme()
+  const online = usePresence()
   // Two-column skills keep the section short enough for small terminals.
   const half = Math.ceil(about.skills.length / 2)
   const left = about.skills.slice(0, half)
@@ -17,8 +19,9 @@ export function About({ visitorNumber }: { visitorNumber: number }) {
         <text flexShrink={0}>
           <span fg={theme.accent}>✱ </span>
           <span fg={theme.dim}>
-            YOU ARE VISITOR N{String(visitorNumber).padStart(4, "0")} · PRESS B FOR THE
-            GUESTBOOK
+            {/* keep under 64 cols with the star — the minimum frame width */}
+            YOU ARE VISITOR N{String(visitorNumber).padStart(4, "0")}
+            {online > 1 ? ` · ${online} ONLINE` : ""} · PRESS B FOR THE GUESTBOOK
           </span>
         </text>
       ) : null}
