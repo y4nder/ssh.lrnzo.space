@@ -1,7 +1,10 @@
 import { TextAttributes } from "@opentui/core"
+import { useMemo } from "react"
 import { identity } from "../content"
-import { resumeRows, type ResumeLine } from "../resume"
+import { useStreamReveal } from "../hooks/useStreamReveal"
+import { resumeLineLength, resumeRows, type ResumeLine } from "../resume"
 import { useTheme } from "../theme"
+import { Cursor } from "./Cursor"
 import { Label } from "./Label"
 import { Rule } from "./Rule"
 import { StatusBar } from "./StatusBar"
@@ -9,7 +12,9 @@ import { StatusBar } from "./StatusBar"
 // The CV takeover: `r` swaps the entire frame — masthead, tabs, everything —
 // for this dedicated document page; esc returns to the regular app. App owns
 // `scroll` (j/k move it a line at a time); this component renders the visible
-// window of the pre-wrapped line array from buildResumeLines.
+// window of the pre-wrapped line array from buildResumeLines. Lines stream in
+// typewriter-style the first time the viewport exposes them (useStreamReveal)
+// and render instantly ever after.
 export function ResumePage({
   lines,
   scroll,
@@ -28,7 +33,14 @@ export function ResumePage({
   const visible = lines.slice(offset, offset + rows)
   const below = lines.length - offset - visible.length
 
+  const lineLengths = useMemo(() => lines.map((l) => resumeLineLength(l, width)), [lines, width])
+  // `lines` only rebuilds when the frame width changes, so width doubles as
+  // the reveal's resetKey: a re-wrap latches instead of retyping.
+  const { shownFor, activeLine } = useStreamReveal(lineLengths, offset, offset + visible.length, width)
+
   const render = (line: ResumeLine, key: number) => {
+    const n = shownFor(key)
+    const cursor = key === activeLine ? <Cursor blink={false} /> : null
     switch (line.kind) {
       case "blank":
         return (
@@ -37,59 +49,96 @@ export function ResumePage({
           </text>
         )
       case "rule":
-        return <Rule key={key} width={width} />
-      case "heading":
-        return <Label key={key} text={line.text} accent />
-      case "center":
-        return (
-          <box key={key} flexDirection="row" width="100%" height={1} justifyContent="center">
-            <text
-              flexShrink={1}
-              fg={line.dim ? theme.dim : theme.fg}
-              attributes={line.bold ? TextAttributes.BOLD : undefined}
-            >
-              {line.bold ? line.text.toUpperCase() : line.text}
-            </text>
-          </box>
+        // Sweeps left to right; Rule floors at 1 char, hence the blank guard.
+        return n === 0 ? (
+          <text key={key} height={1} flexShrink={0}>
+            {" "}
+          </text>
+        ) : (
+          <Rule key={key} width={n} />
         )
-      case "split":
+      case "heading":
+        return <Label key={key} text={line.text.slice(0, n) || " "} accent />
+      case "center": {
+        // Fixed left pad instead of justifyContent: re-centering a growing
+        // slice would jitter the line sideways on every tick.
+        const full = line.bold ? line.text.toUpperCase() : line.text
+        const pad = " ".repeat(Math.max(0, Math.floor((width - full.length) / 2)))
+        const t = full.slice(0, n)
+        return (
+          <text
+            key={key}
+            height={1}
+            flexShrink={0}
+            fg={line.dim ? theme.dim : theme.fg}
+            attributes={line.bold ? TextAttributes.BOLD : undefined}
+          >
+            {pad + t || " "}
+            {cursor}
+          </text>
+        )
+      }
+      case "split": {
+        // Left column types first, then the right. The right column keeps its
+        // full-width padding (cursor replaces one pad cell) so the right edge
+        // never slides while it grows.
+        const leftShown = Math.min(n, line.left.length)
+        const rightShown = Math.max(0, n - line.left.length)
+        const rightCursor = cursor && leftShown === line.left.length ? cursor : null
+        const rightPad = " ".repeat(Math.max(0, line.right.length - rightShown - (rightCursor ? 1 : 0)))
         return (
           <box key={key} flexDirection="row" width="100%" height={1}>
             <text flexShrink={1} fg={theme.fg} attributes={TextAttributes.BOLD}>
-              {line.left.toUpperCase()}
+              {line.left.slice(0, leftShown).toUpperCase() || " "}
+              {rightCursor ? null : cursor}
             </text>
             <box flexGrow={1} minWidth={1} />
             <text flexShrink={0} fg={theme.dim}>
-              {line.right.toUpperCase()}
+              {line.right.slice(0, rightShown).toUpperCase()}
+              {rightCursor}
+              {rightPad}
             </text>
           </box>
         )
-      case "text":
+      }
+      case "text": {
+        const t = line.text.slice(0, n)
         return (
-          <text key={key} flexShrink={0} fg={line.dim ? theme.dim : theme.fg}>
-            {line.text}
+          <text key={key} height={1} flexShrink={0} fg={line.dim ? theme.dim : theme.fg}>
+            {t || " "}
+            {cursor}
           </text>
         )
-      case "bullet":
+      }
+      case "bullet": {
+        const t = ((line.first ? "✱ " : "  ") + line.text).slice(0, n)
         return line.first ? (
-          <text key={key} flexShrink={0} fg={theme.fg}>
-            <span fg={theme.accent}>✱ </span>
-            {line.text}
+          <text key={key} height={1} flexShrink={0} fg={theme.fg}>
+            <span fg={theme.accent}>{t.slice(0, 2)}</span>
+            {t.slice(2)}
+            {cursor}
+            {t.length === 0 ? " " : null}
           </text>
         ) : (
-          <text key={key} flexShrink={0} fg={theme.fg}>
-            {"  " + line.text}
+          <text key={key} height={1} flexShrink={0} fg={theme.fg}>
+            {t || " "}
+            {cursor}
           </text>
         )
-      case "end":
+      }
+      case "end": {
+        const full = "✱ END OF DOCUMENT"
+        const pad = " ".repeat(Math.max(0, Math.floor((width - full.length) / 2)))
+        const t = full.slice(0, n)
         return (
-          <box key={key} flexDirection="row" width="100%" height={1} justifyContent="center">
-            <text flexShrink={0}>
-              <span fg={theme.accent}>✱ </span>
-              <span fg={theme.dim}>END OF DOCUMENT</span>
-            </text>
-          </box>
+          <text key={key} height={1} flexShrink={0}>
+            {pad || (t ? null : " ")}
+            <span fg={theme.accent}>{t.slice(0, 2)}</span>
+            <span fg={theme.dim}>{t.slice(2)}</span>
+            {cursor}
+          </text>
         )
+      }
     }
   }
 

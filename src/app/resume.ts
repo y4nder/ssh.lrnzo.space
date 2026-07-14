@@ -22,6 +22,28 @@ export function resumeRows(frameH: number): number {
   return Math.max(1, frameH - RESUME_CHROME)
 }
 
+// Printable chars per line for the stream reveal. Must stay in lockstep with
+// how ResumePage renders each kind: bullets type their 2-char prefix, split
+// types left then right, rules sweep the full frame width.
+export function resumeLineLength(line: ResumeLine, width: number): number {
+  switch (line.kind) {
+    case "blank":
+      return 0
+    case "rule":
+      return width
+    case "heading":
+    case "center":
+    case "text":
+      return line.text.length
+    case "split":
+      return line.left.length + line.right.length
+    case "bullet":
+      return line.text.length + 2
+    case "end":
+      return "✱ END OF DOCUMENT".length
+  }
+}
+
 export function buildResumeLines(width: number): ResumeLine[] {
   const lines: ResumeLine[] = []
   const blank = () => lines.push({ kind: "blank" })

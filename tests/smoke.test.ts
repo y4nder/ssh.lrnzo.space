@@ -184,10 +184,14 @@ test(
     try {
       const stream = await shell(client)
       await collectUntil(stream, (s) => containsCI(s, identity.name))
+      // The stream reveal types the document in chunks with SGR moves between
+      // them AND the literal ▮ cursor glyph drawn at each chunk boundary, so
+      // CV predicates must strip both to match across chunks.
+      const typed = (s: string) => stripAnsi(s).replaceAll("▮", "")
       stream.write("r") // CV takeover: the EDUCATION heading is newly drawn
-      await collectUntil(stream, (s) => containsCI(s, "education"))
+      await collectUntil(stream, (s) => containsCI(typed(s), "education"))
       stream.write("G") // jump to the bottom of the document
-      await collectUntil(stream, (s) => containsCI(s, "end of document"))
+      await collectUntil(stream, (s) => containsCI(typed(s), "end of document"))
       stream.write("\x1b") // esc returns to the regular app (about redraws)
       await collectUntil(stream, (s) => containsCI(s, "passionate"))
     } finally {
