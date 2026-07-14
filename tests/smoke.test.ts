@@ -16,6 +16,34 @@ const containsCI = (all: string, needle: string) => all.toLowerCase().includes(n
 // then \x1b[…m then " · 2026-…"); strip them before matching across spans.
 const stripAnsi = (all: string) => all.replace(/\x1b\[[0-9;?]*[ -/]*[@-~]/g, "")
 
+// Typewriter text (About bio, CV stream, console banner) arrives in
+// budget-sized chunks, and where a chunk boundary lands depends on the total
+// char count AND frame coalescing — any word can get sliced mid-stream. Other
+// rows keep animating while the typewriter runs (header pulse, rule sweeps,
+// glitch decay, the ▮ cursor glyph), so their cells land BETWEEN the two
+// halves of a sliced word even after stripping SGR codes. Match a typed
+// phrase as its characters in order, tolerating interleaved non-alphanumeric
+// cells — interleaved animation junk is block/box glyphs, never letters, and
+// unrelated text always interposes letters that break the sequence.
+const typedMatch = (phrase: string) => {
+  const re = new RegExp(
+    phrase
+      .toLowerCase()
+      .split("")
+      .map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("[^a-z0-9]*"),
+  )
+  return (all: string) => re.test(stripAnsi(all).toLowerCase())
+}
+
+// Proves a takeover (CV/guestbook/console) closed back to the app: About
+// remounts and retypes its bio. The header pulse (and, for the console, the
+// tail of the ` glitch burst) animates over the first bio lines as they
+// type, interleaving LETTER cells between chunks — so early bio words can
+// never be matched reliably. The last bio line types ~700ms in, after those
+// animations settle, and streams clean.
+const backOnAbout = typedMatch("no browser involved")
+
 // A theme accent painted as a truecolor SGR foreground proves which theme is live.
 function accentSgr(name: keyof typeof THEMES): string {
   const hex = THEMES[name].accent
@@ -184,16 +212,12 @@ test(
     try {
       const stream = await shell(client)
       await collectUntil(stream, (s) => containsCI(s, identity.name))
-      // The stream reveal types the document in chunks with SGR moves between
-      // them AND the literal ▮ cursor glyph drawn at each chunk boundary, so
-      // CV predicates must strip both to match across chunks.
-      const typed = (s: string) => stripAnsi(s).replaceAll("▮", "")
       stream.write("r") // CV takeover: the EDUCATION heading is newly drawn
-      await collectUntil(stream, (s) => containsCI(typed(s), "education"))
+      await collectUntil(stream, typedMatch("education"))
       stream.write("G") // jump to the bottom of the document
-      await collectUntil(stream, (s) => containsCI(typed(s), "end of document"))
-      stream.write("\x1b") // esc returns to the regular app (about redraws)
-      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+      await collectUntil(stream, typedMatch("end of document"))
+      stream.write("\x1b") // esc returns to the regular app (about retypes)
+      await collectUntil(stream, backOnAbout)
     } finally {
       client.end()
     }
@@ -231,8 +255,8 @@ test(
       // the message text already streamed as compose-field echo, so match the
       // entry META line — "name · date" only exists in the browse list
       await collectUntil(stream, (s) => containsCI(stripAnsi(s), "ci-guest ·"))
-      stream.write("\x1b") // esc returns to the regular app (about redraws)
-      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+      stream.write("\x1b") // esc returns to the regular app (about retypes)
+      await collectUntil(stream, backOnAbout)
     } finally {
       client.end()
     }
@@ -291,16 +315,17 @@ test(
     try {
       const stream = await shell(client)
       await collectUntil(stream, (s) => containsCI(s, identity.name))
-      // the boot banner types out in small chunks with SGR/cursor codes
-      // between them, so console predicates must match the STRIPPED stream
       stream.write("`") // hidden console takeover: boot banner is newly drawn
-      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "guest shell"))
+      // "guest shell" is banner line 1 and types INSIDE the ` glitch burst,
+      // which can eat one of its letters (see backOnAbout); the closing
+      // banner line lands after the burst.
+      await collectUntil(stream, typedMatch("for commands"))
       stream.write("whoami\r")
-      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "visitor #"))
+      await collectUntil(stream, typedMatch("visitor #"))
       stream.write("sudo rm -rf /\r") // the bit must stay a bit
-      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "just kidding"))
+      await collectUntil(stream, typedMatch("just kidding"))
       stream.write("exit\r") // the exit command closes the console too
-      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+      await collectUntil(stream, backOnAbout)
     } finally {
       client.end()
     }
@@ -316,9 +341,9 @@ test(
       const stream = await shell(client)
       await collectUntil(stream, (s) => containsCI(s, identity.name))
       stream.write("`")
-      await collectUntil(stream, (s) => containsCI(stripAnsi(s), "guest shell"))
-      stream.write("\x1b") // esc returns to the regular app (about redraws)
-      await collectUntil(stream, (s) => containsCI(s, "passionate"))
+      await collectUntil(stream, typedMatch("for commands")) // post-burst banner line
+      stream.write("\x1b") // esc returns to the regular app (about retypes)
+      await collectUntil(stream, backOnAbout)
     } finally {
       client.end()
     }
@@ -341,7 +366,7 @@ test(
       // rate-limit-free) and must NOT swap the frame for the console
       stream.write("tick`tock")
       const all = await collectUntil(stream, (s) => containsCI(stripAnsi(s), "tick`tock"))
-      expect(containsCI(stripAnsi(all), "guest shell")).toBe(false)
+      expect(typedMatch("guest shell")(all)).toBe(false)
     } finally {
       client.end()
     }
