@@ -173,6 +173,52 @@ const COMMANDS: Command[] = [
     },
   },
   {
+    name: "fastfetch",
+    aliases: ["neofetch"],
+    summary: "system splash",
+    run: (_a, ctx) => {
+      // Block-letter LRNZO wordmark; kept fg so it never clashes with the
+      // accent title / dim separator stacked above it.
+      const logo = [
+        "█    ███  █  █ ████ ████",
+        "█    █  █ ██ █   █  █  █",
+        "█    ███  █ ██  █   █  █",
+        "█    █ █  █  █ █    █  █",
+        "████ █  █ █  █ ████ ████",
+      ]
+      const title = `guest@${identity.host}`
+      const online =
+        ctx.online <= 1 ? "just you" : `${ctx.online} sessions`
+      const info = [
+        `OS: ${identity.banner} portfolio (TUI)`,
+        `Host: ${identity.host}`,
+        `Kernel: OpenTUI + ssh2`,
+        `Uptime: ${formatUptime().replace(/^up /, "")}`,
+        `Shell: ${identity.banner}/console v0.1`,
+        `WM: React`,
+        `Runtime: Bun + TypeScript`,
+        `Visitors: ${getStore().totalVisits()}`,
+        `Online: ${online}`,
+        `You: visitor #${String(ctx.visitorNumber).padStart(4, "0")}`,
+      ]
+      // Zip the art column against the info column; whichever is taller pads
+      // the other with blanks (the fake-fs `ls` uses the same join style).
+      const w = Math.max(...logo.map((l) => l.length))
+      const body: OutLine[] = []
+      for (let i = 0; i < Math.max(logo.length, info.length); i++) {
+        const art = (logo[i] ?? "").padEnd(w)
+        body.push({ text: `${art}  ${info[i] ?? ""}`.trimEnd() })
+      }
+      return {
+        lines: [
+          { text: title, style: "accent" },
+          { text: "─".repeat(title.length), style: "dim" },
+          ...body,
+        ],
+      }
+    },
+  },
+  {
     name: "whoami",
     summary: "who ssh'd in",
     run: (_a, ctx) => ({
