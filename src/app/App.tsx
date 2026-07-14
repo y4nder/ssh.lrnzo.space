@@ -15,6 +15,7 @@ import { Rule } from "./components/Rule"
 import { Splash } from "./components/Splash"
 import { StatusBar, type Hint } from "./components/StatusBar"
 import { TabBar } from "./components/TabBar"
+import { useGlitchBurst } from "./hooks/useGlitchBurst"
 import { usePresence } from "./hooks/usePresence"
 import { About } from "./sections/About"
 import { Contact } from "./sections/Contact"
@@ -45,6 +46,14 @@ export function App({
   const { width, height } = useTerminalDimensions()
   const online = usePresence()
   const [themeName, setThemeName] = useState<ThemeName>("signal")
+  const glitch = useGlitchBurst()
+  // Every theme change goes through here so the repaint lands under a burst
+  // painted in the INCOMING accent — the new signal punching in.
+  const switchTheme = (next: ThemeName | ((current: ThemeName) => ThemeName)) => {
+    const to = typeof next === "function" ? next(themeName) : next
+    glitch(THEMES[to].accent)
+    setThemeName(to)
+  }
   const [phase, setPhase] = useState<"splash" | "main">("splash")
   const [sectionIdx, setSectionIdx] = useState(0)
   const [cursors, setCursors] = useState<Record<SectionId, number>>({
@@ -125,7 +134,7 @@ export function App({
     // The CV page owns the keyboard while open — only scroll/theme/exit work.
     if (cvOpen) {
       if (key.name === "escape" || key.name === "backspace" || key.name === "r") setCvOpen(false)
-      else if (key.name === "t") setThemeName(nextTheme)
+      else if (key.name === "t") switchTheme(nextTheme)
       else if (key.name === "j" || key.name === "down")
         setResumeScroll((s) => Math.min(resumeMaxScroll, s + 1))
       else if (key.name === "k" || key.name === "up") setResumeScroll((s) => Math.max(0, s - 1))
@@ -146,6 +155,7 @@ export function App({
     // input only mounts on the re-render after this handler returns.
     if (key.name === "`") {
       key.preventDefault()
+      glitch(theme.accent)
       setConsoleOpen(true)
       return
     }
@@ -155,7 +165,7 @@ export function App({
       return
     }
     if (key.name === "t") {
-      setThemeName(nextTheme)
+      switchTheme(nextTheme)
       return
     }
     if (key.name === "tab") {
@@ -266,7 +276,7 @@ export function App({
               session={consoleSession}
               onSession={setConsoleSession}
               onClose={() => setConsoleOpen(false)}
-              onTheme={setThemeName}
+              onTheme={switchTheme}
             />
           ) : gbOpen ? (
             <GuestbookPage
@@ -275,7 +285,7 @@ export function App({
               height={frameH}
               onClose={() => setGbOpen(false)}
               onExit={onExit}
-              onToggleTheme={() => setThemeName(nextTheme)}
+              onToggleTheme={() => switchTheme(nextTheme)}
             />
           ) : cvOpen ? (
             <ResumePage
