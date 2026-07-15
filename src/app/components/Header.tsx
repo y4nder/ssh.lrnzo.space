@@ -39,9 +39,15 @@ function FlickerBanner() {
 export function Header({ compact, pulseKey }: { compact: boolean; pulseKey?: unknown }) {
   const theme = useTheme()
 
+  // The two branches MUST carry distinct keys: both root at a <box>, so on a
+  // compact↔full resize React reuses the instance and only diffs props — but
+  // OpenTUI's width/height setters silently ignore null (isDimensionType
+  // guard), so the reconciler can't CLEAR compact's height={1} and the full
+  // masthead lays out inside a 1-row box (banner bottom-aligns 3 rows above
+  // the frame). Keys force a fresh renderable per mode.
   if (compact) {
     return (
-      <box flexDirection="row" width="100%" height={1}>
+      <box key="compact" flexDirection="row" width="100%" height={1}>
         <text>
           <span fg={theme.fg} attributes={TextAttributes.BOLD}>
             {identity.name.toUpperCase()}
@@ -55,7 +61,7 @@ export function Header({ compact, pulseKey }: { compact: boolean; pulseKey?: unk
   }
 
   return (
-    <box flexDirection="column" width="100%">
+    <box key="full" flexDirection="column" width="100%">
       <box flexDirection="row" alignItems="flex-end">
         <FlickerBanner />
         <text fg={theme.accent}>.END</text>
