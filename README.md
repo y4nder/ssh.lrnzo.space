@@ -6,6 +6,10 @@ A terminal-UI portfolio served over SSH — the app *is* the SSH server.
 ssh lrnzo.space
 ```
 
+![Demo of the SSH portfolio TUI](assets/demo.gif)
+
+*(Recorded with [vhs](https://github.com/charmbracelet/vhs) — regenerate from the repo root with `vhs scripts/demo.tape`.)*
+
 **Dark terminals only (for now).** The background defers to the visitor's
 terminal, but the text tokens assume a dark one — on a light terminal the
 body text is near-invisible. If this ever matters enough:
