@@ -17,16 +17,18 @@ Set TypingSpeed 100ms
 Type "ssh lrnzo.space"
 Sleep 900ms
 
-# ...but run the local entry off camera (no prod visit/presence pollution)
+# ...but run the local entry off camera (no prod visit/presence pollution).
+# Resume the moment the splash mounts (its block cursor hits the screen),
+# so the host typewriter plays on camera instead of during the blackout.
 Hide
 Ctrl+U
 Type "DB_PATH=/tmp/vhs-demo.db bun src/local.tsx"
 Enter
-Sleep 1.5s
+Wait+Screen /▮/
 Show
 
-# banner flicker + about typewriter entrance
-Sleep 6s
+# splash types the host, then banner flicker + about typewriter entrance
+Sleep 8s
 
 # walk a couple of sections
 Type "e"
