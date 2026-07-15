@@ -12,6 +12,9 @@ out
 dist
 *.tgz
 
+# vhs mp4 demo (derived from scripts/demo.tape via `bun run demo:mp4`)
+assets/*.mp4
+
 # code coverage
 coverage
 *.lcov

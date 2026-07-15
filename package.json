@@ -7,7 +7,9 @@
     "start": "bun src/server.ts",
     "dev": "bun --watch src/server.ts",
     "local": "bun --watch src/local.tsx",
-    "typecheck": "bunx tsc --noEmit"
+    "typecheck": "bunx tsc --noEmit",
+    "demo": "vhs scripts/demo.tape",
+    "demo:mp4": "sed -e 's|^Output .*|Output assets/demo.mp4|' -e 's|^Set FontSize .*|Set FontSize 22|' -e 's|^Set Width .*|Set Width 1920|' -e 's|^Set Height .*|Set Height 1080|' -e 's|^Set Padding .*|Set Padding 18\\nSet Framerate 15|' scripts/demo.tape > /tmp/demo-1080.tape && vhs /tmp/demo-1080.tape"
   },
   "devDependencies": {
     "@types/bun": "latest",

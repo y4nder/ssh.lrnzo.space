@@ -1,5 +1,7 @@
 # Demo GIF for the README — regenerate from the repo root with:
-#   vhs scripts/demo.tape
+#   vhs scripts/demo.tape          (or: bun run demo)
+# A crisper 1920x1080 MP4 (gitignored) derives from this same tape:
+#   bun run demo:mp4
 # Records the dev entry (src/local.tsx), which renders the same app the
 # SSH server serves. A throwaway DB keeps the real guestbook/visit data clean.
 
