@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     init: true
     ports:
-      # host port 22 belongs to the portfolio; admin sshd lives on 2200
+      # host port 22 is the portfolio; container listens on 2222 internally
       - "22:2222"
     volumes:
       # host key generated per environment, never baked into the image

@@ -4,9 +4,11 @@ on:
   push:
 
 env:
-  VPS_HOST: 185.201.9.190
-  VPS_PORT: "2200"
-  VPS_USER: deploy
+  # Admin sshd host/port/user live in repo secrets, not in the tree —
+  # this repo is public, no reason to advertise the deploy door.
+  VPS_HOST: ${{ secrets.VPS_HOST }}
+  VPS_PORT: ${{ secrets.VPS_PORT }}
+  VPS_USER: ${{ secrets.VPS_USER }}
   APP_DIR: /opt/ssh-portfolio
 
 jobs:
@@ -33,8 +35,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          # pinned host key of the VPS admin sshd (port 2200)
-          echo "[185.201.9.190]:2200 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK9JFFjVBTdJfnEEfSwrS0Q/AY6751+lJoRa9IRyN3m+" >> ~/.ssh/known_hosts
+          # pinned host key of the VPS admin sshd (line format: `[host]:port keytype key`)
+          echo "[$VPS_HOST]:$VPS_PORT ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK9JFFjVBTdJfnEEfSwrS0Q/AY6751+lJoRa9IRyN3m+" >> ~/.ssh/known_hosts
 
       - name: Sync code
         run: |

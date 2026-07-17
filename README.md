@@ -86,16 +86,6 @@ volume-mounted read-only; it must be owned by uid 1000 (the container's
 non-root `bun` user). Regenerating it would show visitors a scary
 host-key-changed warning — don't.
 
-## VPS SSH layout (since 2026-07-13 cutover)
-
-- **Port 22** — this portfolio (`ssh lrnzo.space`), docker-published.
-- **Port 2200** — admin sshd (`Host yander_vps` in `~/.ssh/config`), key-only:
-  password auth and root password login are disabled
-  (`/etc/ssh/sshd_config.d/49-hardening.conf`; the `49-` prefix outranks
-  cloud-init's `50-` because sshd takes the first value it sees).
-- sshd runs as a classic `ssh.service` — socket activation was disabled
-  because `ssh.socket`'s ListenStream overrides `Port` directives on
-  Ubuntu 24.04.
-- The faculytics CI pipeline still points at port 22 and will fail on its
-  next run (project parked; deliberate). Fix = change its SSH port secret
-  to 2200.
+The portfolio is docker-published on **port 22** (`ssh lrnzo.space`); admin
+access is a separate hardened sshd on another port. Deploy target host/port/user
+are stored as GitHub Actions secrets, not in this tree.
