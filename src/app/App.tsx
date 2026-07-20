@@ -9,6 +9,7 @@ import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
 import { ConsolePage } from "./components/ConsolePage"
 import { DetailView } from "./components/DetailView"
 import { GuestbookPage } from "./components/GuestbookPage"
+import { StatsPage } from "./components/StatsPage"
 import { Header } from "./components/Header"
 import { ResumePage } from "./components/ResumePage"
 import { Rule } from "./components/Rule"
@@ -71,6 +72,8 @@ export function App({
   const [resumeScroll, setResumeScroll] = useState(0)
   // `b` swaps the whole frame for the guestbook, same takeover pattern.
   const [gbOpen, setGbOpen] = useState(false)
+  // `s` opens the analytics dashboard — same takeover pattern.
+  const [statsOpen, setStatsOpen] = useState(false)
   // ` (backtick) opens the hidden console — deliberately absent from every
   // hint bar. Scrollback/history/cwd live here so they survive close/reopen
   // for the whole SSH session (ConsolePage remounts on each open).
@@ -125,6 +128,8 @@ export function App({
     // The guestbook owns the keyboard entirely — this guard must stay ABOVE
     // the quit check: in compose mode `q` and digits are message text.
     if (gbOpen) return
+    // Same for stats: it owns the keyboard while open.
+    if (statsOpen) return
     // Same for the console: `q` and everything else is prompt text.
     if (consoleOpen) return
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
@@ -149,6 +154,10 @@ export function App({
     }
     if (key.name === "b") {
       setGbOpen(true)
+      return
+    }
+    if (key.name === "s") {
+      setStatsOpen(true)
       return
     }
     // The hidden console. The opening ` can't leak into its prompt: the
@@ -265,6 +274,9 @@ export function App({
         ...(listCount === 0 && section.id !== "contact" && frameW >= 72
           ? [{ key: "b", label: "guestbook" }]
           : []),
+        ...(listCount === 0 && section.id !== "contact" && frameW >= 72
+          ? [{ key: "s", label: "stats" }]
+          : []),
         { key: "t", label: "theme" },
         { key: "q", label: "quit" },
       ]
@@ -295,6 +307,14 @@ export function App({
               width={frameW}
               height={frameH}
               onClose={() => setGbOpen(false)}
+              onExit={onExit}
+              onToggleTheme={() => switchTheme(nextTheme)}
+            />
+          ) : statsOpen ? (
+            <StatsPage
+              width={frameW}
+              height={frameH}
+              onClose={() => setStatsOpen(false)}
               onExit={onExit}
               onToggleTheme={() => switchTheme(nextTheme)}
             />

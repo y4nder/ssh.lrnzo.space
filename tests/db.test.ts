@@ -52,6 +52,39 @@ test("a zero-minute window disables rate limiting", () => {
   expect(store.addEntry("1.1.1.1", "a", "second").ok).toBe(true)
 })
 
+test("analytics: unique ips, peak day, and daily rollup", () => {
+  const store = createStore(openDb(":memory:"), 0)
+  store.recordVisit("1.1.1.1")
+  store.recordVisit("1.1.1.1") // same ip, second visit
+  store.recordVisit("2.2.2.2")
+  store.addEntry("3.3.3.3", "sig", "hi")
+
+  expect(store.totalVisits()).toBe(3)
+  expect(store.totalUniqueIps()).toBe(2)
+
+  const today = new Date().toISOString().slice(0, 10)
+  const peak = store.peakDay()
+  expect(peak).toEqual({ day: today, visits: 3 })
+
+  const daily = store.dailyStats(30)
+  const row = daily.find((d) => d.day === today)
+  expect(row).toEqual({ day: today, visits: 3, uniqueIps: 2, guestbookEntries: 1 })
+
+  // hourly buckets sum back to the day's visit total
+  const hourly = store.dayHourly(today)
+  expect(hourly.reduce((a, h) => a + h.visits, 0)).toBe(3)
+
+  const gb = store.dayGuestbookEntries(today)
+  expect(gb).toEqual([{ name: "sig", message: "hi" }])
+})
+
+test("analytics: empty store reports zeroes and no peak", () => {
+  const store = fresh()
+  expect(store.totalUniqueIps()).toBe(0)
+  expect(store.peakDay()).toBeNull()
+  expect(store.dailyStats(30)).toEqual([])
+})
+
 test("guestbook prunes to the newest entries, newest first", () => {
   const store = createStore(openDb(":memory:"), 0)
   for (let i = 1; i <= MAX_ENTRIES + 5; i++) store.addEntry("1.1.1.1", "n", `msg ${i}`)

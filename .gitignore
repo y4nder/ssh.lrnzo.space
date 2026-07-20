@@ -36,6 +36,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .cache
 *.tsbuildinfo
 
+# reasonix (local tooling — never committed)
+.reasonix/
+reasonix.toml
+
 # IntelliJ based IDEs
 .idea
 

@@ -23,6 +23,23 @@ export type AddResult =
   | { ok: false; reason: "empty" }
   | { ok: false; reason: "rate_limited"; retryAfterSec: number }
 
+export type DailyStats = {
+  day: string      // "YYYY-MM-DD"
+  visits: number
+  uniqueIps: number
+  guestbookEntries: number
+}
+
+export type HourlyBucket = {
+  hour: number     // 0-23
+  visits: number
+}
+
+export type DayGuestbookEntry = {
+  name: string
+  message: string
+}
+
 // SSH input is untrusted: keep printable ASCII only. The compose UI filters
 // per keystroke too; this is the last line of defense before the row lands.
 export function sanitize(input: string, max: number): string {
@@ -125,7 +142,70 @@ export function createStore(db: Database, rateLimitMin = RATE_LIMIT_MIN) {
     return insert()
   }
 
-  return { recordVisit, totalVisits, listGuestbook, addEntry }
+  // ── analytics ──────────────────────────────────────────────────────
+
+  const totalUniqueIps = (): number => {
+    const row = db
+      .query<{ n: number }, []>("SELECT COUNT(DISTINCT ip) AS n FROM visits")
+      .get()
+    return row!.n
+  }
+
+  const peakDay = (): { day: string; visits: number } | null => {
+    const row = db
+      .query<{ day: string; visits: number }, []>(
+        "SELECT date(created_at) AS day, COUNT(*) AS visits FROM visits GROUP BY day ORDER BY visits DESC LIMIT 1",
+      )
+      .get()
+    return row ?? null
+  }
+
+  const dailyStats = (days: number): DailyStats[] => {
+    const visitRows = db
+      .query<{ day: string; visits: number; unique_ips: number }, [number]>(
+        `SELECT date(created_at) AS day, COUNT(*) AS visits, COUNT(DISTINCT ip) AS unique_ips
+         FROM visits
+         WHERE created_at >= datetime('now', '-' || ? || ' days')
+         GROUP BY day
+         ORDER BY day`,
+      )
+      .all(days)
+
+    const gbRows = db
+      .query<{ day: string; entries: number }, [number]>(
+        `SELECT date(created_at) AS day, COUNT(*) AS entries
+         FROM guestbook
+         WHERE created_at >= datetime('now', '-' || ? || ' days')
+         GROUP BY day
+         ORDER BY day`,
+      )
+      .all(days)
+
+    const gbMap = new Map(gbRows.map((r) => [r.day, r.entries]))
+    return visitRows.map((r) => ({
+      day: r.day,
+      visits: r.visits,
+      uniqueIps: r.unique_ips,
+      guestbookEntries: gbMap.get(r.day) ?? 0,
+    }))
+  }
+
+  const dayHourly = (day: string): HourlyBucket[] =>
+    db
+      .query<HourlyBucket, [string]>(
+        `SELECT CAST(strftime('%H', created_at) AS INTEGER) AS hour, COUNT(*) AS visits
+         FROM visits WHERE date(created_at) = ? GROUP BY hour ORDER BY hour`,
+      )
+      .all(day)
+
+  const dayGuestbookEntries = (day: string): DayGuestbookEntry[] =>
+    db
+      .query<DayGuestbookEntry, [string]>(
+        "SELECT name, message FROM guestbook WHERE date(created_at) = ? ORDER BY id",
+      )
+      .all(day)
+
+  return { recordVisit, totalVisits, listGuestbook, addEntry, totalUniqueIps, peakDay, dailyStats, dayHourly, dayGuestbookEntries }
 }
 
 export type Store = ReturnType<typeof createStore>

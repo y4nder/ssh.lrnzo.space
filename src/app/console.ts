@@ -273,6 +273,46 @@ const COMMANDS: Command[] = [
     },
   },
   {
+    name: "stats",
+    aliases: ["analytics"],
+    summary: "visit analytics",
+    run: () => {
+      const store = getStore()
+      const daily = store.dailyStats(7)
+      const totalUnique = store.totalUniqueIps()
+      const peak = store.peakDay()
+      const total = store.totalVisits()
+
+      const lines: OutLine[] = [
+        { text: `total visits: ${total}  ·  unique ips: ${totalUnique}`, style: "accent" },
+      ]
+      if (peak) {
+        lines.push({
+          text: `peak day: ${peak.day} (${peak.visits} visits)`,
+          style: "dim",
+        })
+      }
+      lines.push({ text: "─".repeat(30), style: "dim" })
+      if (daily.length === 0) {
+        lines.push({ text: "no data yet.", style: "dim" })
+      } else {
+        lines.push({
+          text: " date        visits  unique  gb",
+          style: "dim",
+        })
+        for (const d of daily) {
+          const date = d.day.slice(5) // "MM-DD"
+          lines.push({
+            text: ` ${date.padEnd(12)}${String(d.visits).padStart(5)}  ${String(d.uniqueIps).padStart(5)}  ${String(d.guestbookEntries).padStart(3)}`,
+          })
+        }
+      }
+      lines.push({ text: "─".repeat(30), style: "dim" })
+      lines.push({ text: "press esc, then s for full dashboard", style: "dim" })
+      return { lines }
+    },
+  },
+  {
     name: "uptime",
     summary: "server age",
     run: () => ({ lines: [{ text: `${formatUptime()} · 1 shell (this one)` }] }),
