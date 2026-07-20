@@ -397,7 +397,7 @@ function DetailView({
     const gb = store.dayGuestbookEntries(selDay.day)
     const maxH = Math.max(...hourly.map((h) => h.visits), 1)
     const blocks = hourlyBlocks(hourly, maxH)
-    const msgs = gb.map((e) => `✱ ${e.name}: ${e.message}`)
+    const msgs = gb.map((e) => `✱ ${e.ip}  ${e.name}: ${e.message}`)
     const avail = Math.max(1, detailRows - 4)
     const { lines: gbLines } = fitLines(msgs, width - 4, avail, false)
     return { blocks, gbLines, gbCount: gb.length, maxH }

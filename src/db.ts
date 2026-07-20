@@ -36,6 +36,7 @@ export type HourlyBucket = {
 }
 
 export type DayGuestbookEntry = {
+  ip: string
   name: string
   message: string
 }
@@ -201,7 +202,7 @@ export function createStore(db: Database, rateLimitMin = RATE_LIMIT_MIN) {
   const dayGuestbookEntries = (day: string): DayGuestbookEntry[] =>
     db
       .query<DayGuestbookEntry, [string]>(
-        "SELECT name, message FROM guestbook WHERE date(created_at) = ? ORDER BY id",
+        "SELECT ip, name, message FROM guestbook WHERE date(created_at) = ? ORDER BY id",
       )
       .all(day)
 
