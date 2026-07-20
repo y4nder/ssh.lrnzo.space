@@ -75,7 +75,7 @@ test("analytics: unique ips, peak day, and daily rollup", () => {
   expect(hourly.reduce((a, h) => a + h.visits, 0)).toBe(3)
 
   const gb = store.dayGuestbookEntries(today)
-  expect(gb).toEqual([{ name: "sig", message: "hi" }])
+  expect(gb).toEqual([{ ip: "3.3.3.3", name: "sig", message: "hi" }])
 })
 
 test("analytics: empty store reports zeroes and no peak", () => {
