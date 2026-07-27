@@ -6,7 +6,36 @@ import { Label } from "../components/Label"
 import { Cursor } from "../components/Cursor"
 import { useTypewriter } from "../hooks/useTypewriter"
 import { useFlashIn } from "../hooks/useFlashIn"
-import { QR_HEIGHT, QR_ROWS, QR_WIDTH } from "../qr"
+import { QR_ENTRIES, type QrEntry } from "../qr"
+
+// Max dimensions across all QR entries for layout gating
+const QR_WIDTH = Math.max(...QR_ENTRIES.map((e) => e.width))
+const QR_HEIGHT = Math.max(...QR_ENTRIES.map((e) => e.height))
+
+// Keyed sub-component — remounts on each toggle so useFlashIn replays the
+// strobe-in animation for the new QR code.
+function QrFlash({ entry }: { entry: QrEntry }) {
+  const theme = useTheme()
+  const flash = useFlashIn(true)
+  const visible = flash === "bright" || flash === "shown"
+  return (
+    <box flexDirection="column" width={QR_WIDTH} flexShrink={0} marginRight={1}>
+      {entry.rows.map((line, i) => (
+        <text
+          key={i}
+          height={1}
+          flexShrink={0}
+          fg={flash === "bright" ? "#ffffff" : theme.accent}
+        >
+          {visible ? line : " "}
+        </text>
+      ))}
+      <text flexShrink={0} fg={theme.dim}>
+        {flash === "shown" ? `  ${entry.caption}` : " "}
+      </text>
+    </box>
+  )
+}
 
 type Copied = { idx: number | "all"; ok: boolean } | null
 
@@ -28,6 +57,8 @@ export function Contact({ width, height }: { width: number; height: number }) {
   // the j actually landed on (same batch gotcha as the console's paste path).
   const selectedRef = useRef(selected)
   const [copied, setCopied] = useState<Copied>(null)
+  const [qrIndex, setQrIndex] = useState(0)
+  const [qrToggleKey, setQrToggleKey] = useState(0)
 
   // Left column needs ~36 cols (2-col selection gutter + 12-pad label +
   // longest value) plus a gap; vertically: Label + blank + QR rows + caption.
@@ -43,10 +74,6 @@ export function Contact({ width, height }: { width: number; height: number }) {
     `✱ STAY CONNECTED — ${identity.host.toUpperCase()}`,
   ]
   const { lines: typed, done, activeLine } = useTypewriter(lines, 0)
-  // QR strobes in only after the text finishes typing. The box stays mounted
-  // at full size throughout so the reveal never reflows the left column.
-  const flash = useFlashIn(done)
-  const qrVisible = flash === "bright" || flash === "shown"
 
   // OSC 52 rides the same output stream as the frames, so the yank reaches
   // the *client's* clipboard even over SSH.
@@ -82,6 +109,9 @@ export function Contact({ width, height }: { width: number; height: number }) {
       copy("all")
     } else if (key.name === "y" || key.name === "return") {
       copy(selectedRef.current)
+    } else if (key.name === "n") {
+      setQrIndex((prev) => (prev + 1) % QR_ENTRIES.length)
+      setQrToggleKey((k) => k + 1)
     }
   })
 
@@ -136,24 +166,14 @@ export function Contact({ width, height }: { width: number; height: number }) {
             {tagFor("all")}
             {(typed[stayIdx] ?? "").length === 0 ? " " : null}
           </text>
-        </box>
-        {showQr ? (
-          <box flexDirection="column" width={QR_WIDTH} flexShrink={0} marginRight={1}>
-            {QR_ROWS.map((line, i) => (
-              <text
-                key={i}
-                height={1}
-                flexShrink={0}
-                fg={flash === "bright" ? "#ffffff" : theme.accent}
-              >
-                {qrVisible ? line : " "}
-              </text>
-            ))}
-            <text flexShrink={0} fg={theme.dim}>
-              {flash === "shown" ? "  SCAN · LINKEDIN" : " "}
+          {showQr && done ? (
+            <text height={1} flexShrink={0} fg={theme.dim}>
+              {"  "}
+              <span fg={theme.accent}>n</span> · switch QR
             </text>
-          </box>
-        ) : null}
+          ) : null}
+        </box>
+        {showQr && done ? <QrFlash key={qrToggleKey} entry={QR_ENTRIES[qrIndex]!} /> : null}
       </box>
     </box>
   )

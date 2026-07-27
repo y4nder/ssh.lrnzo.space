@@ -5,7 +5,7 @@
 // nothing in the visible UI ever mentions this file exists.
 import { getStore } from "../db"
 import { about, contact, experience, identity, projects } from "./content"
-import { QR_ROWS } from "./qr"
+import { QR_ENTRIES } from "./qr"
 import { THEMES, type ThemeName } from "./theme"
 
 export type OutStyle = "fg" | "dim" | "accent" | "error"
@@ -366,14 +366,13 @@ const COMMANDS: Command[] = [
   },
   {
     name: "qr",
-    summary: "linkedin, for your phone",
+    summary: "portfolio + linkedin, for your phone",
     run: () => ({
-      // Rows ≤29 chars never re-wrap (wrapText passes short lines through),
-      // so the module grid survives the scrollback reflow intact.
-      lines: [
-        ...QR_ROWS.map((text) => ({ text, style: "accent" }) as OutLine),
-        { text: `  scan → ${contact.linkedin}`, style: "dim" },
-      ],
+      lines: QR_ENTRIES.flatMap((entry) => [
+        ...entry.rows.map((text) => ({ text, style: "accent" }) as OutLine),
+        { text: `  scan → ${entry.url}`, style: "dim" },
+        { text: "", style: "dim" },
+      ]),
     }),
   },
   {

@@ -312,3 +312,6 @@ export const contactCopy = {
   linkedin: `https://${contact.linkedin}`,
   ssh: contact.ssh,
 }
+
+// Web portfolio URL — the browser version at lrnzo.space
+export const portfolioUrl = "https://lrnzo.space"

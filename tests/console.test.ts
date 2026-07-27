@@ -12,7 +12,7 @@ import {
   promptFor,
   type ConsoleCtx,
 } from "../src/app/console"
-import { QR_HEIGHT } from "../src/app/qr"
+import { QR_ENTRIES, QR_HEIGHT } from "../src/app/qr"
 
 const ctx = (over: Partial<ConsoleCtx> = {}): ConsoleCtx => ({
   ip: "203.0.113.7",
@@ -69,16 +69,26 @@ describe("execute", () => {
     expect(texts(execute("about", ctx()))).toContain("Leander")
   })
 
-  test("qr prints the accent module grid with a scan caption", () => {
+  test("qr prints both QR codes with scan captions", () => {
     const r = execute("qr", ctx())
-    expect(r.lines.length).toBe(QR_HEIGHT + 1)
-    expect(r.lines[1]!.text).toContain("█▀▀▀▀▀█") // finder pattern row
+    // Two QR entries, each: QR_HEIGHT module rows + scan line + blank spacer
+    expect(r.lines.length).toBe(2 * (QR_HEIGHT + 2))
+    // First QR (portfolio) — finder pattern row
+    expect(r.lines[1]!.text).toContain("█▀▀▀▀▀█")
     expect(r.lines[1]!.style).toBe("accent")
-    // every module row fits the min console width — wrapText must pass
-    // them through untouched or the grid shreds
-    for (const l of r.lines.slice(0, -1)) expect(l.text.length).toBeLessThanOrEqual(29)
-    expect(r.lines.at(-1)!.text).toContain("linkedin.com/in/y4nder")
-    expect(r.lines.at(-1)!.style).toBe("dim")
+    // Second QR (linkedin) — finder pattern row
+    const linkedinStart = QR_HEIGHT + 2
+    expect(r.lines[linkedinStart + 1]!.text).toContain("█▀▀▀▀▀█")
+    expect(r.lines[linkedinStart + 1]!.style).toBe("accent")
+    // All module rows fit the min console width
+    for (const l of r.lines) {
+      if (l.style === "accent") expect(l.text.length).toBeLessThanOrEqual(29)
+    }
+    // Scan captions
+    expect(r.lines[QR_HEIGHT]!.text).toContain("lrnzo.space")
+    expect(r.lines[QR_HEIGHT]!.style).toBe("dim")
+    expect(r.lines.at(-2)!.text).toContain("linkedin.com/in/y4nder")
+    expect(r.lines.at(-2)!.style).toBe("dim")
   })
 
   test("echo repeats its arguments", () => {
