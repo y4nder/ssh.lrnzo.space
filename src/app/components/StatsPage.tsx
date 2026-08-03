@@ -6,7 +6,7 @@ import { identity } from "../content"
 import { useTheme } from "../theme"
 import { useListWindow } from "../hooks/useListWindow"
 import { useTraceReveal } from "../hooks/useTraceReveal"
-import { fitLines } from "../util"
+import { center, fitLines } from "../util"
 import { Rule } from "./Rule"
 import { StatusBar } from "./StatusBar"
 
@@ -46,12 +46,6 @@ function divider(label: string, width: number): string {
 function progressBar(ratio: number, len: number): string {
   const filled = Math.round(ratio * len)
   return "█".repeat(filled) + "░".repeat(len - filled)
-}
-
-/** Center a string within `width`, returning left-padding + the string. */
-function center(s: string, width: number): string {
-  const pad = Math.max(0, Math.floor((width - s.length) / 2))
-  return " ".repeat(pad) + s
 }
 
 // Expand the sparse daily rows (only days that had traffic) into a continuous

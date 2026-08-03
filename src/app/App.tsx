@@ -11,12 +11,15 @@ import { DetailView } from "./components/DetailView"
 import { GuestbookPage } from "./components/GuestbookPage"
 import { StatsPage } from "./components/StatsPage"
 import { Header } from "./components/Header"
+import { MusicPage } from "./components/MusicPage"
+import { NowTicker } from "./components/NowTicker"
 import { ResumePage } from "./components/ResumePage"
 import { Rule } from "./components/Rule"
 import { Splash } from "./components/Splash"
 import { StatusBar, type Hint } from "./components/StatusBar"
 import { TabBar } from "./components/TabBar"
 import { useGlitchBurst } from "./hooks/useGlitchBurst"
+import { useHasNowPlaying, useTrackChange } from "./hooks/useNowPlaying"
 import { usePresence } from "./hooks/usePresence"
 import { About } from "./sections/About"
 import { Contact } from "./sections/Contact"
@@ -46,6 +49,9 @@ export function App({
 }) {
   const { width, height } = useTerminalDimensions()
   const online = usePresence()
+  // A boolean, not the snapshot: App must not repaint the whole frame every
+  // poll. See the note in useNowPlaying.ts.
+  const hasTrack = useHasNowPlaying()
   const [themeName, setThemeName] = useState<ThemeName>("signal")
   const glitch = useGlitchBurst()
   // Every theme change goes through here so the repaint lands under a burst
@@ -74,6 +80,9 @@ export function App({
   const [gbOpen, setGbOpen] = useState(false)
   // `s` opens the analytics dashboard — same takeover pattern.
   const [statsOpen, setStatsOpen] = useState(false)
+  // `m` opens the now-playing page. Advertised by the ticker rather than the
+  // hint bar, which already overflows narrow frames.
+  const [musicOpen, setMusicOpen] = useState(false)
   // ` (backtick) opens the hidden console — deliberately absent from every
   // hint bar. Scrollback/history/cwd live here so they survive close/reopen
   // for the whole SSH session (ConsolePage remounts on each open).
@@ -86,6 +95,10 @@ export function App({
   })
 
   const theme = THEMES[themeName]
+  // A track change is a genuinely SHARED event here — one process, one poller —
+  // so every connected session glitches on the same beat. Armed only after the
+  // splash, which owns the frame while it runs.
+  useTrackChange(phase === "main", () => glitch(theme.accent))
   const section = SECTIONS[sectionIdx]!
   const listCount = LIST_COUNTS[section.id]
   const record = expanded ? detailFor(section.id, cursors[section.id]) : null
@@ -99,7 +112,10 @@ export function App({
   // Full masthead only on roomy frames; the banner alone is 37x4.
   const compact = frameW < 76 || frameH < 26
   const headerRows = compact ? 1 : 6
-  const contentHeight = Math.max(4, frameH - headerRows - 6)
+  // The ticker costs its own row plus a rule. With nothing playing the whole
+  // band collapses — no empty strip, and the content gets its two rows back.
+  const tickerOn = hasTrack && frameH >= headerRows + 12
+  const contentHeight = Math.max(4, frameH - headerRows - 6 - (tickerOn ? 2 : 0))
 
   const resumeLines = useMemo(() => buildResumeLines(frameW), [frameW])
   const resumeMaxScroll = Math.max(0, resumeLines.length - resumeRows(frameH))
@@ -132,6 +148,8 @@ export function App({
     if (statsOpen) return
     // Same for the console: `q` and everything else is prompt text.
     if (consoleOpen) return
+    // The music page owns the keyboard too — it runs its own yank key.
+    if (musicOpen) return
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
       return
@@ -158,6 +176,12 @@ export function App({
     }
     if (key.name === "s") {
       setStatsOpen(true)
+      return
+    }
+    // Inert with nothing playing, rather than opening a dead page. Must stay
+    // above the section-accelerator scan below so that never shadows it.
+    if (key.name === "m" && hasTrack) {
+      setMusicOpen(true)
       return
     }
     // The hidden console. The opening ` can't leak into its prompt: the
@@ -310,6 +334,14 @@ export function App({
               onExit={onExit}
               onToggleTheme={() => switchTheme(nextTheme)}
             />
+          ) : musicOpen ? (
+            <MusicPage
+              width={frameW}
+              height={frameH}
+              onClose={() => setMusicOpen(false)}
+              onExit={onExit}
+              onToggleTheme={() => switchTheme(nextTheme)}
+            />
           ) : statsOpen ? (
             <StatsPage
               width={frameW}
@@ -366,6 +398,12 @@ export function App({
                 )}
               </box>
               <Rule width={frameW} />
+              {tickerOn ? (
+                <>
+                  <NowTicker width={frameW} />
+                  <Rule width={frameW} />
+                </>
+              ) : null}
               <StatusBar
                 hints={hints}
                 // presence only on roomy frames: hints already crowd the

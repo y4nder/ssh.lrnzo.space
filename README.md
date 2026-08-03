@@ -39,6 +39,35 @@ forwarding are rejected.
 - `src/tty-stream.ts` — grafts a TTY surface onto the ssh2 channel
 - `src/app/` — the React UI; **all copy lives in `src/app/content.ts`**
 
+### Now playing
+
+A live Spotify readout — a ticker above the status bar, and a full page on `m`
+laid out as a Spotify-Code card: cover art rendered as a themed halftone, its
+signature wave strip fused to the bottom edge, track centred beneath. `c` flips
+the cover for a QR you can scan to open the song on your phone. Data comes from
+`GET /now-playing` on [api.lrnzo.space](https://api.lrnzo.space/now-playing),
+which also feeds the website's banner.
+
+The wave strip is a **deterministic signature of the track**, not a spectrum
+analyser — Spotify deprecated the audio-analysis endpoint for new apps, so
+there is no real spectrum to draw and pretending otherwise would be a lie about
+data we do not have. The shape never moves; progress is carried by colour,
+played bars in the accent and the rest dim.
+
+This is the app's **only outbound HTTP call**, and its shape is dictated by the
+deployment: one process serves every session from one VPS IP, and the endpoint
+rate-limits at 30 req/min per IP. So the poller is a module singleton
+(`src/nowplaying.ts`, same pattern as `src/presence.ts`) — **3 req/min total no
+matter how many people are connected, and nothing at all while nobody is**. The
+website polls per visitor and cannot do that.
+
+- `src/nowplaying.ts` — the shared store and poll loop
+- `src/albumArt.ts` — cover fetch → JPEG decode → luminance grid (once per track)
+- `src/app/music.ts` — pure builders: halftone ramp, marquee, ticker budget, layout
+
+Every failure resolves to *render nothing*: the ticker collapses, `m` goes
+inert, and the frame reflows as if the feature did not exist.
+
 ## Runtime decision (Phase 0 spike, 2026-07-13)
 
 **Bun 1.3.14.** OpenTUI's native renderer is Bun-first (Node needs 26.4+ with
@@ -70,6 +99,32 @@ ssh-keygen -t ed25519 -f keys/host_key -N ""   # once
 bun run dev                                     # then: ssh -p 2222 localhost
 bun run typecheck
 ```
+
+### Environment
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PORT` / `BIND` | `2222` / `0.0.0.0` | listener |
+| `HOST_KEY_PATH` | `keys/host_key` | must be uid 1000 in the container |
+| `MAX_SESSIONS` | `30` | concurrent SSH sessions |
+| `IDLE_TIMEOUT_MS` | — | disconnect idle sessions |
+| `DB_PATH` | `data/portfolio.db` | visitor counter + guestbook |
+| `GUESTBOOK_RATE_MIN` | `10` | minutes between entries per IP |
+| `NOWPLAYING_URL` | `https://api.lrnzo.space/now-playing` | **set to `""` to disable the readout** |
+| `NOWPLAYING_FIXTURE` | — | a `/now-playing` payload as JSON: publishes once, never polls |
+
+`NOWPLAYING_FIXTURE` is how the readout gets exercised offline — the tests and
+`scripts/frame-dump.ts` both use it, and it makes the frame deterministic:
+
+```bash
+NOWPLAYING_FIXTURE='{"isPlaying":true,"track":{"title":"Kalopsia","artist":"Novo Amor",
+  "album":"Interlucent","albumArt":null,"url":"https://open.spotify.com/track/x",
+  "durationMs":240000},"progressMs":60000,"playedAt":null,"ageMs":0}' \
+  bun scripts/frame-dump.ts m
+```
+
+`bun test` sets `NODE_ENV=test`, which disables the poller outright — the suite
+never touches the network, including the server the smoke test spawns.
 
 ## Deploy
 

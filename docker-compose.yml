@@ -19,6 +19,13 @@ services:
       HOST_KEY_PATH: /keys/host_key
       MAX_SESSIONS: "30"
       DB_PATH: /app/data/portfolio.db
+      # Live Spotify readout (the `m` page and the ticker). This is the app's
+      # only outbound request. Stated explicitly even though it is the built-in
+      # default, so the kill switch is obvious: set it to "" to disable the
+      # feature entirely — the ticker collapses and `m` goes inert.
+      # One poller serves every session, and it sleeps while nobody is
+      # connected, so this is 3 req/min at most against a 30/min limit.
+      NOWPLAYING_URL: https://api.lrnzo.space/now-playing
     mem_limit: 512m
     read_only: true
     security_opt:
