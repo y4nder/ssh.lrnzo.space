@@ -13,6 +13,7 @@ import {
   type ConsoleCtx,
 } from "../src/app/console"
 import { QR_ENTRIES, QR_HEIGHT } from "../src/app/qr"
+import { __publish as __publishNowPlaying, clock } from "../src/nowplaying"
 
 const ctx = (over: Partial<ConsoleCtx> = {}): ConsoleCtx => ({
   ip: "203.0.113.7",
@@ -202,6 +203,57 @@ describe("effects", () => {
     const out = texts(execute("history", ctx({ history: ["ls", "cat .secrets"] })))
     expect(out).toContain("1  ls")
     expect(out).toContain("2  cat .secrets")
+  })
+})
+
+describe("np", () => {
+  const track = {
+    title: "Dear Child (I've Been Dying to Reach You)",
+    artist: "Anthony Green",
+    album: "Avalon",
+    url: "https://open.spotify.com/track/2VFxYVlUzDQQrf9ZLDXUIn",
+    durationMs: 200_000,
+  }
+
+  test("says so when there is nothing to report", () => {
+    __publishNowPlaying(null)
+    expect(texts(execute("np", ctx()))).toContain("not configured")
+  })
+
+  test("reports the shared snapshot", () => {
+    __publishNowPlaying({
+      data: { isPlaying: true, track, progressMs: 60_000, playedAt: null, ageMs: 0 },
+      receivedAt: clock(),
+      art: null,
+    })
+    const out = texts(execute("np", ctx()))
+    expect(out).toContain("now playing")
+    expect(out).toContain("Dear Child (I've Been Dying to Reach You)")
+    expect(out).toContain("Anthony Green — Avalon")
+    expect(out).toContain("open.spotify.com/track/2VFxYVlUzDQQrf9ZLDXUIn")
+    expect(out).toMatch(/1:0\d \/ 3:20/)
+    __publishNowPlaying(null)
+  })
+
+  test("labels an idle snapshot as last played, with no meter", () => {
+    __publishNowPlaying({
+      data: { isPlaying: false, track, progressMs: null, playedAt: "2026-08-03T10:00:00.000Z", ageMs: 0 },
+      receivedAt: clock(),
+      art: null,
+    })
+    const out = texts(execute("np", ctx()))
+    expect(out).toContain("last played")
+    expect(out).not.toContain("[")
+    __publishNowPlaying(null)
+  })
+
+  test("the nowplaying alias resolves", () => {
+    __publishNowPlaying(null)
+    expect(texts(execute("nowplaying", ctx()))).toBe(texts(execute("np", ctx())))
+  })
+
+  test("help advertises it", () => {
+    expect(texts(execute("help", ctx()))).toContain("np")
   })
 })
 

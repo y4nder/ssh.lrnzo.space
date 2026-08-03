@@ -1,5 +1,10 @@
 // Greedy word wrap returning the actual lines. Words longer than the width
 // are hard-broken so no line overflows.
+/** Center a string within `width`: left padding + the string, right unpadded. */
+export function center(s: string, width: number): string {
+  return " ".repeat(Math.max(0, Math.floor((width - s.length) / 2))) + s
+}
+
 export function wrapText(text: string, width: number): string[] {
   if (width <= 0 || text.length <= width) return [text]
   const lines: string[] = []

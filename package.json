@@ -23,6 +23,7 @@
   "dependencies": {
     "@opentui/core": "^0.4.3",
     "@opentui/react": "^0.4.3",
+    "jpeg-js": "^0.4.4",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "ssh2": "^1.17.0"

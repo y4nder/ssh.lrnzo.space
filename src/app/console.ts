@@ -4,7 +4,14 @@
 // presence count the rest of the app uses. ConsolePage renders the results;
 // nothing in the visible UI ever mentions this file exists.
 import { getStore } from "../db"
+import {
+  clock,
+  getSnapshot as getNowPlaying,
+  isEnabled as isNowPlayingEnabled,
+  positionMs,
+} from "../nowplaying"
 import { about, contact, experience, identity, projects } from "./content"
+import { meterBar, timecode } from "./music"
 import { QR_ENTRIES } from "./qr"
 import { THEMES, type ThemeName } from "./theme"
 
@@ -251,6 +258,41 @@ const COMMANDS: Command[] = [
         },
       ],
     }),
+  },
+  {
+    name: "np",
+    aliases: ["nowplaying"],
+    summary: "what i'm listening to",
+    run: () => {
+      const snap = getNowPlaying()
+      const track = snap?.data.track
+      // Data first, flag second: a fixture publishes a snapshot with polling
+      // switched off, and that is a working readout, not an unconfigured one.
+      if (!snap || !track) {
+        return {
+          lines: [
+            isNowPlayingEnabled()
+              ? { text: "nothing playing right now.", style: "dim" }
+              : { text: "now-playing is not configured.", style: "dim" },
+          ],
+        }
+      }
+
+      const position = positionMs(snap, clock())
+      const lines: OutLine[] = [
+        { text: snap.data.isPlaying ? "now playing" : "last played", style: "accent" },
+        { text: track.title },
+        { text: `${track.artist}${track.album ? ` — ${track.album}` : ""}`, style: "dim" },
+      ]
+      if (position !== null) {
+        lines.push({
+          text: `[${meterBar(position / track.durationMs, 18)}] ${timecode(position)} / ${timecode(track.durationMs)}`,
+          style: "dim",
+        })
+      }
+      lines.push({ text: track.url, style: "dim" })
+      return { lines }
+    },
   },
   {
     name: "guestbook",

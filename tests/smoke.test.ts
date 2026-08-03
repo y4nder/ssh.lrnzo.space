@@ -51,6 +51,35 @@ function accentSgr(name: keyof typeof THEMES): string {
   return `38;2;${r};${g};${b}`
 }
 
+// A fixed snapshot so the ticker and music page render deterministically with
+// no network at all. `bun test` already sets NODE_ENV=test, which disables the
+// poller in the spawned server too (it inherits process.env below) — this is
+// belt and braces AND the only way to exercise the UI, since a disabled feature
+// renders nothing.
+//
+// The title is short on purpose: a title that overflows the ticker would
+// scroll, and the marquee window would make the emitted bytes depend on
+// timing. ALBUM appears ONLY on the music page, which is what makes it a
+// sound predicate for the takeover under OpenTUI's diff rendering (see the
+// note above the "enter expands" test).
+const NP_TITLE = "Kalopsia"
+const NP_ALBUM = "Interlucent"
+const NP_FIXTURE = {
+  isPlaying: true,
+  track: {
+    title: NP_TITLE,
+    artist: "Novo Amor",
+    album: NP_ALBUM,
+    // No cover: the placeholder renders without a single outbound request.
+    albumArt: null,
+    url: "https://open.spotify.com/track/1SmokeTest0000000000",
+    durationMs: 240_000,
+  },
+  progressMs: 60_000,
+  playedAt: null,
+  ageMs: 0,
+}
+
 const PORT = 2299
 let serverProc: ReturnType<typeof Bun.spawn>
 let tmpDir: string
@@ -70,6 +99,8 @@ beforeAll(async () => {
       IDLE_TIMEOUT_MS: "30000",
       // scratch database — tests must never touch ./data
       DB_PATH: join(tmpDir, "test.db"),
+      // deterministic now-playing, and never a request to api.lrnzo.space
+      NOWPLAYING_FIXTURE: JSON.stringify(NP_FIXTURE),
     },
     stdout: "pipe",
   })
@@ -224,6 +255,52 @@ test(
   },
   15000,
 )
+
+test("the now-playing ticker renders below the content", async () => {
+  const client = await connect()
+  try {
+    const stream = await shell(client)
+    // The ticker paints with the rest of the main frame, so the title streams
+    // contiguously on the first full draw.
+    await collectUntil(stream, (s) => containsCI(stripAnsi(s), NP_TITLE))
+  } finally {
+    client.end()
+  }
+})
+
+test(
+  "m opens the music page and esc returns",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("m")
+      // The album is drawn ONLY here — the ticker shows title and artist, so
+      // matching it cannot be satisfied by cells surviving the previous frame.
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), NP_ALBUM))
+      stream.write("\x1b") // esc returns to the regular app (about retypes)
+      await collectUntil(stream, backOnAbout)
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test("y on the music page yanks the track link over OSC 52", async () => {
+  const client = await connect()
+  try {
+    const stream = await shell(client)
+    await collectUntil(stream, (s) => containsCI(s, identity.name))
+    stream.write("m")
+    await collectUntil(stream, (s) => containsCI(stripAnsi(s), NP_ALBUM))
+    stream.write("y")
+    await collectUntil(stream, (s) => s.includes("\x1b]52;c;"))
+  } finally {
+    client.end()
+  }
+})
 
 test("the about page shows this session's visitor number", async () => {
   const client = await connect()
