@@ -112,19 +112,31 @@ bun run typecheck
 | `GUESTBOOK_RATE_MIN` | `10` | minutes between entries per IP |
 | `NOWPLAYING_URL` | `https://api.lrnzo.space/now-playing` | **set to `""` to disable the readout** |
 | `NOWPLAYING_FIXTURE` | — | a `/now-playing` payload as JSON: publishes once, never polls |
+| `BLOG_URL` | `https://api.lrnzo.space/posts` | **set to `""` to disable the log** |
+| `BLOG_FIXTURE` | — | an array of posts *with bodies*: seeds the index and the reader, never fetches |
 
-`NOWPLAYING_FIXTURE` is how the readout gets exercised offline — the tests and
-`scripts/frame-dump.ts` both use it, and it makes the frame deterministic:
+Both fixtures are how the two API-backed pages get exercised offline — the tests
+and `scripts/frame-dump.ts` use them, and they make the frame deterministic:
 
 ```bash
 NOWPLAYING_FIXTURE='{"isPlaying":true,"track":{"title":"Kalopsia","artist":"Novo Amor",
   "album":"Interlucent","albumArt":null,"url":"https://open.spotify.com/track/x",
   "durationMs":240000},"progressMs":60000,"playedAt":null,"ageMs":0}' \
   bun scripts/frame-dump.ts m
+
+BLOG_FIXTURE='[{"slug":"a-post","no":"001","title":"A post","dek":"A summary.",
+  "publishedAt":"2026-01-02T00:00:00.000Z","kind":"NOTE","tags":["x"],"readingMinutes":2,
+  "media":{"alt":"Cover art."},"body":"## Heading\n\nSome *prose*."}]' \
+  bun scripts/frame-dump.ts l
 ```
 
-`bun test` sets `NODE_ENV=test`, which disables the poller outright — the suite
-never touches the network, including the server the smoke test spawns.
+`bun test` sets `NODE_ENV=test`, which disables both outright — the suite never
+touches the network, including the server the smoke test spawns.
+
+The log is **read-only**: the app issues `GET /posts` and `GET /posts/:slug` and
+nothing else. It fetches on demand rather than polling, and caches the index for
+five minutes — every visitor shares this box's single egress IP against the
+API's 100 req/min limit.
 
 ## Deploy
 
