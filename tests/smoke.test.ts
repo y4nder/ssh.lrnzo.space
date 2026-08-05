@@ -80,6 +80,38 @@ const NP_FIXTURE = {
   ageMs: 0,
 }
 
+// A fixed log so the index and the reader render with no network at all, on
+// the same reasoning as NP_FIXTURE above. The strings are deliberately unlike
+// anything else the app draws: OpenTUI diff-renders, so cells from the previous
+// frame survive, and a predicate can only prove a takeover opened if the text it
+// matches is drawn nowhere else.
+const BLOG_TITLE = "Zephyr Notebook"
+// Body text only — never on the index, so matching it proves the reader opened.
+const BLOG_PHRASE = "quiet machinery hums"
+// The dek, which the index types out as a preview under the list. Leaving the
+// reader remounts the index, so this retypes — the page's own equivalent of
+// backOnAbout, and the only sound way to prove the first esc landed on the
+// index. Matching the index's hint bar does NOT work: the renderer re-emits
+// only changed cells, so returning to a bar that already read "j/k select"
+// resends "sele" and "t" and leaves the untouched "c" out of the stream.
+const BLOG_DEK = "index preview line"
+const BLOG_FIXTURE = [
+  {
+    slug: "zephyr-notebook",
+    no: "007",
+    title: BLOG_TITLE,
+    dek: `An ${BLOG_DEK}.`,
+    publishedAt: "2026-03-04T00:00:00.000Z",
+    kind: "NOTE",
+    tags: ["fixture"],
+    readingMinutes: 2,
+    // No cover: an empty alt marks it decorative, and nothing is ever fetched.
+    media: { alt: "", src: "", kind: "image", width: 1, height: 1 },
+    status: "published",
+    body: `The ${BLOG_PHRASE} along.\n\n## Second section\n\nMore words follow here.\n`,
+  },
+]
+
 const PORT = 2299
 let serverProc: ReturnType<typeof Bun.spawn>
 let tmpDir: string
@@ -101,6 +133,8 @@ beforeAll(async () => {
       DB_PATH: join(tmpDir, "test.db"),
       // deterministic now-playing, and never a request to api.lrnzo.space
       NOWPLAYING_FIXTURE: JSON.stringify(NP_FIXTURE),
+      // same for the log behind `l`
+      BLOG_FIXTURE: JSON.stringify(BLOG_FIXTURE),
     },
     stdout: "pipe",
   })
@@ -281,6 +315,77 @@ test(
       await collectUntil(stream, (s) => containsCI(stripAnsi(s), NP_ALBUM))
       stream.write("\x1b") // esc returns to the regular app (about retypes)
       await collectUntil(stream, backOnAbout)
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "l opens the log index and esc returns",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("l")
+      // The row title is drawn straight into the list, not typed, so a plain
+      // match is sound here — unlike the dek preview under it.
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), BLOG_TITLE))
+      stream.write("\x1b")
+      await collectUntil(stream, backOnAbout)
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "enter reads an entry, and esc walks back one level at a time",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("l")
+      await collectUntil(stream, (s) => containsCI(stripAnsi(s), BLOG_TITLE))
+      stream.write("\r")
+      // The body streams in through useStreamReveal, so it MUST go through
+      // typedMatch — chunk boundaries and interleaved animation cells break a
+      // raw match, which is exactly what made this suite flake before.
+      await collectUntil(stream, typedMatch(BLOG_PHRASE))
+      // First esc drops the reader and lands back on the index — asserted by
+      // the index's own hint bar, which the reader replaces while it is open.
+      // The two writes must not share an input burst: both would be dispatched
+      // against the same pre-render state and close the reader twice.
+      stream.write("\x1b")
+      await collectUntil(stream, typedMatch(BLOG_DEK))
+      // Second esc closes the page itself.
+      stream.write("\x1b")
+      await collectUntil(stream, backOnAbout)
+    } finally {
+      client.end()
+    }
+  },
+  15000,
+)
+
+test(
+  "the console lists the log",
+  async () => {
+    const client = await connect()
+    try {
+      const stream = await shell(client)
+      await collectUntil(stream, (s) => containsCI(s, identity.name))
+      stream.write("`")
+      // Wait for the banner before typing: the prompt input only mounts on the
+      // re-render after the ` handler returns, so a command sent in the same
+      // burst is dropped on the floor.
+      await collectUntil(stream, typedMatch("for commands"))
+      stream.write("blog\r")
+      await collectUntil(stream, typedMatch(BLOG_TITLE))
     } finally {
       client.end()
     }

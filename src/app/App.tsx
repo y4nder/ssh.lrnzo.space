@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react"
 import { useKeyboard, useTerminalDimensions } from "@opentui/react"
+import { ensureIndex } from "../blog"
 import { experience, honors, projects } from "./content"
 import { detailFor } from "./detail"
 import { SECTIONS, type SectionId } from "./nav"
 import { buildResumeLines, resumeRows } from "./resume"
 import { type ConsoleSession } from "./console"
 import { THEMES, ThemeContext, nextTheme, type ThemeName } from "./theme"
+import { BlogPage } from "./components/BlogPage"
 import { ConsolePage } from "./components/ConsolePage"
 import { DetailView } from "./components/DetailView"
 import { GuestbookPage } from "./components/GuestbookPage"
@@ -83,6 +85,10 @@ export function App({
   // `m` opens the now-playing page. Advertised by the ticker rather than the
   // hint bar, which already overflows narrow frames.
   const [musicOpen, setMusicOpen] = useState(false)
+  // `l` opens the blog. Unlike `m` it is never inert: the index is fetched on
+  // demand, so "not loaded yet" and "nothing to show" are states the page
+  // itself reports rather than reasons to swallow the key.
+  const [blogOpen, setBlogOpen] = useState(false)
   // ` (backtick) opens the hidden console — deliberately absent from every
   // hint bar. Scrollback/history/cwd live here so they survive close/reopen
   // for the whole SSH session (ConsolePage remounts on each open).
@@ -150,6 +156,8 @@ export function App({
     if (consoleOpen) return
     // The music page owns the keyboard too — it runs its own yank key.
     if (musicOpen) return
+    // The blog owns the keyboard: it runs a two-level esc (reader → index).
+    if (blogOpen) return
     if (key.name === "q" || (key.ctrl && key.name === "c")) {
       onExit()
       return
@@ -182,6 +190,13 @@ export function App({
     // above the section-accelerator scan below so that never shadows it.
     if (key.name === "m" && hasTrack) {
       setMusicOpen(true)
+      return
+    }
+    // Same placement rule as `m`: above the accelerator scan. Opening also
+    // revalidates the index, which is a no-op while it is still fresh.
+    if (key.name === "l") {
+      ensureIndex()
+      setBlogOpen(true)
       return
     }
     // The hidden console. The opening ` can't leak into its prompt: the
@@ -342,6 +357,14 @@ export function App({
               onExit={onExit}
               onToggleTheme={() => switchTheme(nextTheme)}
             />
+          ) : blogOpen ? (
+            <BlogPage
+              width={frameW}
+              height={frameH}
+              onClose={() => setBlogOpen(false)}
+              onExit={onExit}
+              onToggleTheme={() => switchTheme(nextTheme)}
+            />
           ) : statsOpen ? (
             <StatsPage
               width={frameW}
@@ -373,7 +396,9 @@ export function App({
                   />
                 ) : (
                   <>
-                    {section.id === "about" ? <About visitorNumber={visitorNumber} /> : null}
+                    {section.id === "about" ? (
+                      <About visitorNumber={visitorNumber} width={frameW} />
+                    ) : null}
                     {section.id === "experience" ? (
                       <Experience
                         selected={cursors.experience}

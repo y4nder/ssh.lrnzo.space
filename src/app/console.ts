@@ -3,6 +3,7 @@
 // except the real-data commands, which read the same module-level store and
 // presence count the rest of the app uses. ConsolePage renders the results;
 // nothing in the visible UI ever mentions this file exists.
+import { ensureIndex, getIndex, isEnabled as isBlogEnabled } from "../blog"
 import { getStore } from "../db"
 import {
   clock,
@@ -12,6 +13,7 @@ import {
 } from "../nowplaying"
 import { about, contact, experience, identity, projects } from "./content"
 import { meterBar, timecode } from "./music"
+import { postKicker } from "./post"
 import { QR_ENTRIES } from "./qr"
 import { THEMES, type ThemeName } from "./theme"
 
@@ -291,6 +293,43 @@ const COMMANDS: Command[] = [
         })
       }
       lines.push({ text: track.url, style: "dim" })
+      return { lines }
+    },
+  },
+  {
+    name: "blog",
+    aliases: ["log", "posts"],
+    summary: "what i've been writing",
+    run: () => {
+      // Kick a fetch on first use: someone can reach the console without ever
+      // pressing `l`, and the index is only warmed on the presence edge.
+      ensureIndex()
+      const index = getIndex()
+      // Data first, flag second — same reasoning as `np` above.
+      if (index.status !== "ready") {
+        return {
+          lines: [
+            {
+              text: !isBlogEnabled()
+                ? "the log is not configured."
+                : index.status === "error"
+                  ? "can't reach the log right now."
+                  : "fetching the log…",
+              style: "dim",
+            },
+          ],
+        }
+      }
+      if (index.posts.length === 0)
+        return { lines: [{ text: "no entries yet.", style: "dim" }] }
+
+      const lines: OutLine[] = []
+      for (const post of index.posts.slice(0, 8)) {
+        lines.push({ text: `${post.no ? `${post.no}  ` : ""}${post.title}`, style: "accent" })
+        lines.push({ text: `     ${postKicker(post)}`, style: "dim" })
+      }
+      lines.push({ text: "", style: "dim" })
+      lines.push({ text: "press l to read them here.", style: "dim" })
       return { lines }
     },
   },
