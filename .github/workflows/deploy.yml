@@ -2,6 +2,13 @@ name: test & deploy
 
 on:
   push:
+  # Manual kick. `on: push` alone means a run can only ever be created by a
+  # commit, so when the Actions service drops a push (2026-08-06: workflow runs
+  # failing to start during a critical Actions outage) the merge lands with
+  # nothing deployed and no run object to re-run — recovering meant pushing an
+  # empty commit. Dispatching on main satisfies the deploy job's ref check, so
+  # this redeploys rather than only re-testing.
+  workflow_dispatch:
 
 env:
   # Admin sshd host/port/user live in repo secrets, not in the tree —
