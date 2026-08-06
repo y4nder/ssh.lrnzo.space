@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import type { Luma } from "../src/albumArt"
+import type { Art, Luma } from "../src/albumArt"
 import {
   artLines,
+  artSpans,
+  printedSpans,
   marqueeWindow,
   meterBar,
   musicLayout,
@@ -20,6 +22,19 @@ const HEIGHTS = Array.from({ length: 19 }, (_, i) => 14 + i) // frameH is 14..32
 
 function flat(size: number, value: number): Luma {
   return { size, data: new Float32Array(size * size).fill(value) }
+}
+
+/** A cover whose ink at each grid cell is chosen by `at`. */
+function art(luma: Luma, palette: string[], at: (x: number, y: number) => number = () => 0): Art {
+  const ink = new Uint8Array(luma.size * luma.size)
+  for (let y = 0; y < luma.size; y++) {
+    for (let x = 0; x < luma.size; x++) ink[y * luma.size + x] = at(x, y)
+  }
+  return { luma, palette, ink }
+}
+
+function rowText(spans: { text: string }[]): string {
+  return spans.map((s) => s.text).join("")
 }
 
 describe("timecode", () => {
@@ -191,6 +206,118 @@ describe("artLines", () => {
   test("degenerate sizes return empty rather than throwing", () => {
     expect(artLines(flat(8, 0.5), 0, 4)).toEqual([])
     expect(artLines(flat(8, 0.5), 4, 0)).toEqual([])
+  })
+})
+
+describe("artSpans", () => {
+  const INKS = ["#aa0000", "#0000aa"]
+
+  test("every row still spans exactly cols, so the card cannot reflow", () => {
+    const spans = artSpans(art(flat(64, 0.5), INKS), 32, 16)
+    expect(spans).toHaveLength(16)
+    for (const row of spans) expect(rowText(row)).toHaveLength(32)
+  })
+
+  test("draws the same glyphs artLines does — colour changes paint, not tone", () => {
+    const luma = flat(32, 0.6)
+    const spans = artSpans(art(luma, INKS), 16, 8)
+    expect(spans.map(rowText)).toEqual(artLines(luma, 16, 8))
+  })
+
+  test("coalesces a single-ink cover into one span per row", () => {
+    // The whole point of spans over per-cell colour: a flat region costs one
+    // escape, not one per column.
+    const spans = artSpans(art(flat(32, 0.5), INKS), 16, 8)
+    for (const row of spans) {
+      expect(row).toHaveLength(1)
+      expect(row[0]!.color).toBe("#aa0000")
+    }
+  })
+
+  test("splits a row where the ink changes", () => {
+    const size = 16
+    const spans = artSpans(art(flat(size, 0.5), INKS, (x) => (x < size / 2 ? 0 : 1)), 8, 4)
+    for (const row of spans) {
+      expect(row).toHaveLength(2)
+      expect(row[0]).toEqual({ text: "▒▒▒▒", color: "#aa0000", ink: 0 })
+      expect(row[1]).toEqual({ text: "▒▒▒▒", color: "#0000aa", ink: 1 })
+    }
+  })
+
+  test("takes the ink the cell is mostly made of, not the one it starts with", () => {
+    // Downsampling 16 grid cells into 4 columns: the first output column is
+    // three parts ink 0 to one part ink 1 and must not flip on the minority.
+    const size = 16
+    const spans = artSpans(art(flat(size, 0.5), INKS, (x) => (x % 4 === 3 ? 1 : 0)), 4, 2)
+    for (const row of spans) expect(row).toHaveLength(1)
+  })
+
+  test("a cover with no palette paints in one uncoloured span per row", () => {
+    // Quantisation gave up; the page falls back to the accent it used before
+    // colour existed.
+    const spans = artSpans(art(flat(32, 0.5), []), 16, 8)
+    for (const row of spans) {
+      expect(row).toHaveLength(1)
+      expect(row[0]!.color).toBeNull()
+    }
+  })
+
+  test("a null cover yields the placeholder, uncoloured, at the same footprint", () => {
+    const spans = artSpans(null, 20, 6)
+    expect(spans).toHaveLength(6)
+    for (const row of spans) {
+      expect(rowText(row)).toHaveLength(20)
+      expect(row.every((s) => s.color === null)).toBe(true)
+    }
+    expect(spans.map(rowText).join("")).toContain("NO COVER")
+  })
+
+  test("degenerate sizes return empty rather than throwing", () => {
+    expect(artSpans(art(flat(8, 0.5), INKS), 0, 4)).toEqual([])
+    expect(artSpans(art(flat(8, 0.5), INKS), 4, 0)).toEqual([])
+  })
+})
+
+describe("printedSpans", () => {
+  const INKS = ["#aa0000", "#0000aa", "#00aa00"]
+  const size = 24
+  // Ink 0 across most of the row, ink 1 then ink 2 in narrowing bands — the
+  // coverage order quantize() guarantees.
+  const cover = () =>
+    art(flat(size, 0.5), INKS, (x) => (x < 12 ? 0 : x < 18 ? 1 : 2))
+
+  test("prints nothing on pass zero, and prints it at full width", () => {
+    // The card is pre-sized to the cover. A pass that narrowed a row would
+    // reflow the whole thing mid-animation.
+    const rows = printedSpans(artSpans(cover(), 12, 4), 0)
+    for (const row of rows) {
+      expect(rowText(row)).toHaveLength(12)
+      expect(rowText(row).trim()).toBe("")
+    }
+  })
+
+  test("lays each ink down in turn", () => {
+    const spans = artSpans(cover(), 12, 4)
+    const inked = (passes: number) =>
+      new Set(
+        printedSpans(spans, passes)
+          .flat()
+          .filter((s) => s.color !== null)
+          .map((s) => s.color),
+      )
+    expect(inked(1)).toEqual(new Set([INKS[0]!]))
+    expect(inked(2)).toEqual(new Set([INKS[0]!, INKS[1]!]))
+    expect(inked(3)).toEqual(new Set(INKS))
+  })
+
+  test("a finished print is the cover itself", () => {
+    const spans = artSpans(cover(), 12, 4)
+    expect(printedSpans(spans, INKS.length)).toEqual(spans)
+  })
+
+  test("an uninked row prints immediately — a placeholder has nothing to register", () => {
+    const rows = printedSpans(artSpans(art(flat(16, 0.5), []), 8, 2), 0)
+    expect(rows.map(rowText).join("")).toBe(artSpans(art(flat(16, 0.5), []), 8, 2).map(rowText).join(""))
   })
 })
 
