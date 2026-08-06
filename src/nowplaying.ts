@@ -12,7 +12,7 @@
 // states. A dead API must never produce a broken frame, and an unhandled
 // rejection in here would take down the process serving all 30 sessions.
 
-import { getArt, ensureArt, type Luma } from "./albumArt"
+import { getArt, ensureArt, type Art } from "./albumArt"
 import { getOnline, subscribe as subscribePresence } from "./presence"
 
 export type Track = {
@@ -38,8 +38,8 @@ export type Snapshot = {
   data: NowPlayingData
   /** Monotonic reading of when this arrived. See positionMs. */
   receivedAt: number
-  /** Cover luminance, filled by a LATER publish once the jpeg lands. */
-  art: Luma | null
+  /** Cover glyphs and inks, filled by a LATER publish once the jpeg lands. */
+  art: Art | null
 }
 
 /** Matches the API's 15s playing window closely enough to stay current. */
@@ -229,11 +229,11 @@ function schedule(ms: number): void {
   timer.unref?.()
 }
 
-function onArt(url: string, luma: Luma | null): void {
+function onArt(url: string, art: Art | null): void {
   const current = snapshot
   // The track may well have moved on while the jpeg was in flight.
-  if (luma === null || current === null || current.data.track?.albumArt !== url) return
-  publish({ ...current, art: luma })
+  if (art === null || current === null || current.data.track?.albumArt !== url) return
+  publish({ ...current, art })
 }
 
 function fail(): void {

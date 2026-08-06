@@ -3,9 +3,20 @@ import { useKeyboard, useRenderer } from "@opentui/react"
 import { useEffect, useMemo, useState } from "react"
 import { clock, positionMs } from "../../nowplaying"
 import { identity } from "../content"
+import { useFlashIn } from "../hooks/useFlashIn"
+import { useInkPasses } from "../hooks/useInkPasses"
 import { useNowPlaying } from "../hooks/useNowPlaying"
 import { useTick } from "../hooks/useTick"
-import { artLines, musicLayout, timecode, titleWindow, wavePlayed, waveform } from "../music"
+import {
+  artSpans,
+  musicLayout,
+  printedSpans,
+  type Span,
+  timecode,
+  titleWindow,
+  wavePlayed,
+  waveform,
+} from "../music"
 import { QUIET, qrForUrl } from "../qr"
 import { useTheme } from "../theme"
 import { center } from "../util"
@@ -27,13 +38,27 @@ function clip(text: string, width: number): string {
  * track — the one thing this readout does better than the website it borrows
  * its data from.
  *
- * The art is drawn as one <text> PER ROW in the accent colour rather than
- * per-cell half-blocks. Half-blocks would need an fg and a bg truecolour escape
- * for every cell — roughly 20KB per repaint down an SSH channel, times every
- * connected session on a theme switch — and painting a background in every cell
- * would break theme.ts's contract of deferring to the visitor's own terminal
- * background. A one-colour ramp also means `t` recolours the artwork by
- * changing a single prop.
+ * The art is drawn as COLOURED RUNS of one <text> per row — the cover's own
+ * three inks (see albumArt.ts) — never as per-cell half-blocks. Half-blocks
+ * would need an fg and a bg truecolour escape for every cell, and painting a
+ * background in every cell would break theme.ts's contract of deferring to the
+ * visitor's own terminal background.
+ *
+ * Three flat inks is what makes the colour affordable at all. Measured on a
+ * real 300px cover at 40x20 cells, down one SSH channel per repaint:
+ *
+ *   flat accent (what this used to be)      20 escapes   ~2.7KB
+ *   three inks, run-length collapsed       103 escapes   ~4.3KB
+ *   truecolour per cell                    660 escapes  ~14.6KB
+ *
+ * Sleeves are mostly large flat regions, so the runs collapse to ~2-3 spans per
+ * row rather than one per column. That is the whole argument for K=3.
+ *
+ * THE COVER DELIBERATELY DOES NOT FOLLOW `t`. It is the one true-colour object
+ * on the site; everything around it — wave strip, title, QR, chrome — stays on
+ * theme.accent, which is what keeps the page reading as this app rather than as
+ * a photo viewer. A cover whose palette failed to extract falls back to the
+ * accent and looks exactly like this page did before colour.
  *
  * NOTHING HERE USES theme.faint FOR TEXT. It is a structural token (~#242a33
  * on circuit) meant for placeholder fill; text painted in it is invisible on a
@@ -68,12 +93,13 @@ export function MusicPage({
   const qr = useMemo(() => (url ? qrForUrl(url, "SCAN · TRACK") : null), [url])
   const layout = musicLayout(width, height, qr)
   const art = useMemo(
-    () => artLines(snap?.art ?? null, layout.artCols, layout.artRows),
+    () => artSpans(snap?.art ?? null, layout.artCols, layout.artRows),
     [snap?.art, layout.artCols, layout.artRows],
   )
 
   // A frame that lost the room for the QR must not be stuck showing it.
   const code = showCode && layout.qrAvailable && qr !== null
+  const inkCount = snap?.art?.palette.length ?? 0
 
   useKeyboard((key) => {
     if (key.eventType === "release") return
@@ -99,7 +125,25 @@ export function MusicPage({
 
   // The slot is pre-sized to the taller of cover and QR, so `c` never reflows
   // the card. Both are centred inside cardWidth for the same reason.
-  const slot: string[] = code && qr ? qr.rows : art
+  // ENTRANCE. The cover registers ink by ink; the QR, being one flat block,
+  // strobes instead — the same reveal the contact page's QR uses. Both replay
+  // on a flip, on a theme switch, and on the art finally landing (the jpeg
+  // arrives on a later publish than the track, so without this the cover pops
+  // in on its own schedule).
+  const reveal = `${url}|${theme.name}|${snap?.art == null ? "wait" : "art"}|${code ? "qr" : "art"}`
+  const passes = useInkPasses(inkCount, reveal)
+  const flash = useFlashIn(code, reveal)
+
+  // A QR is one flat accent block by necessity — it stops scanning without the
+  // contrast — so its rows carry no colour of their own.
+  const slot: Span[][] =
+    code && qr
+      ? // Blanked with spaces, never dropped: the dark half of a strobe still
+        // has to occupy the row, or the card twitches at 60ms intervals.
+        qr.rows.map((text) => [
+          { text: flash === "hidden" || flash === "off" ? " ".repeat(text.length) : text, color: null, ink: null },
+        ])
+      : printedSpans(art, passes)
   const slotWidth = code && qr ? qr.width : layout.artCols
   const slotPad = Math.max(0, Math.floor((layout.cardWidth - slotWidth) / 2))
   const topPad = Math.max(0, Math.floor((layout.slotRows - slot.length) / 2))
@@ -165,10 +209,14 @@ export function MusicPage({
                   {" "}
                 </text>
               ))}
-              {slot.map((line, i) => (
-                <text key={i} height={1} flexShrink={0} fg={slotColor}>
-                  {" ".repeat(slotPad)}
-                  {line}
+              {slot.map((row, i) => (
+                <text key={i} height={1} flexShrink={0}>
+                  <span>{" ".repeat(slotPad)}</span>
+                  {row.map((span, j) => (
+                    <span key={j} fg={span.color ?? slotColor}>
+                      {span.text}
+                    </span>
+                  ))}
                 </text>
               ))}
               {Array.from({ length: layout.slotRows - slot.length - topPad }, (_, i) => (

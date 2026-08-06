@@ -3,7 +3,7 @@
 // width budget, the marquee window, the halftone ramp — can be tested directly
 // instead of through a rendered frame.
 
-import type { Luma } from "../albumArt"
+import type { Art, Luma } from "../albumArt"
 
 /** Coverage ramp, dark to light. Five levels is all a brutalist palette wants. */
 export const RAMP = " ░▒▓█"
@@ -139,6 +139,99 @@ export function artLines(luma: Luma | null, cols: number, rows: number): string[
     out.push(line)
   }
   return out
+}
+
+/** A run of cells sharing one ink. `null` means "whatever the caller paints in". */
+export type Span = { text: string; color: string | null; ink: number | null }
+
+/**
+ * The cover as coloured runs: the glyphs artLines already produces, cut into
+ * spans wherever the ink changes.
+ *
+ * Runs rather than per-cell colour is the whole reason this is affordable. A
+ * sleeve is mostly large flat regions, so three inks collapse to ~2-3 spans per
+ * row — measured on a real 300px cover, 103 colour escapes per repaint against
+ * 660 for per-cell truecolour, down every connected SSH session.
+ *
+ * A cover with no palette (quantisation gave up, or the art never decoded)
+ * yields one uncoloured span per row, which paints exactly as this page did
+ * before it had colour.
+ */
+export function artSpans(art: Art | null, cols: number, rows: number): Span[][] {
+  const glyphs = artLines(art?.luma ?? null, cols, rows)
+  if (!art || art.palette.length === 0 || art.luma.size <= 0) {
+    return glyphs.map((text) => [{ text, color: null, ink: null }])
+  }
+
+  // Driven by the glyph rows, so the degenerate sizes artLines already refuses
+  // to draw stay refused here rather than becoming empty rows.
+  const out: Span[][] = []
+  for (let y = 0; y < glyphs.length; y++) {
+    const line = glyphs[y]!
+    const row: Span[] = []
+    for (let x = 0; x < cols; x++) {
+      const ink = dominantInk(art, x, y, cols, rows)
+      const color = art.palette[ink] ?? null
+      const last = row[row.length - 1]
+      if (last && last.ink === ink) last.text += line[x] ?? ""
+      else row.push({ text: line[x] ?? "", color, ink })
+    }
+    out.push(row)
+  }
+  return out
+}
+
+/**
+ * The ink a cell is MOSTLY made of.
+ *
+ * A plurality vote, not an average: averaging two ink indices lands on a third
+ * ink that neither half of the cell is anywhere near, so an edge between two
+ * colours would fringe with an unrelated one.
+ */
+function dominantInk(art: Art, x: number, y: number, cols: number, rows: number): number {
+  const { size } = art.luma
+  const y0 = Math.floor((y * size) / rows)
+  const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * size) / rows))
+  const x0 = Math.floor((x * size) / cols)
+  const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * size) / cols))
+
+  const votes = new Uint32Array(art.palette.length)
+  for (let sy = y0; sy < y1 && sy < size; sy++) {
+    for (let sx = x0; sx < x1 && sx < size; sx++) {
+      const ink = art.ink[sy * size + sx] ?? 0
+      if (ink < votes.length) votes[ink]!++
+    }
+  }
+
+  let best = 0
+  for (let i = 1; i < votes.length; i++) if (votes[i]! > votes[best]!) best = i
+  return best
+}
+
+/**
+ * The cover part-printed: the first `passes` inks laid down, the rest still
+ * blank paper.
+ *
+ * Blanking replaces a span's glyphs with the SAME NUMBER of spaces rather than
+ * dropping the span. The card is pre-sized to the cover — a pass that returned
+ * a narrower row would reflow the whole thing mid-animation, which is the one
+ * thing an entrance must never do.
+ *
+ * Inks are laid down in palette order, which quantize() sorts widest-first, so
+ * the background field goes down before the detail that sits on it. A span with
+ * no ink (a placeholder, or a cover whose palette never extracted) has nothing
+ * to register and prints immediately.
+ */
+export function printedSpans(rows: Span[][], passes: number): Span[][] {
+  return rows.map((row) =>
+    row.map((span) =>
+      span.ink === null || span.ink < passes
+        ? span
+        : // Colour goes too: unprinted paper carries no ink, and keeping one
+          // would spend a colour escape on cells that draw nothing.
+          { ...span, text: " ".repeat(span.text.length), color: null },
+    ),
+  )
 }
 
 /** Same footprint as real art, so a missing cover costs no layout shift. */
