@@ -1,6 +1,6 @@
 // The blog index and post bodies, read from api.lrnzo.space.
 //
-// STRICTLY READ-ONLY. Only GET /posts and GET /posts/:slug are ever touched;
+// STRICTLY READ-ONLY. Only GET /v1/posts and GET /v1/posts/:slug are ever touched;
 // both are public and unguarded. The admin reads on that API sit behind a
 // GitHub OAuth session cookie that cannot be minted server-side, and drafts are
 // filtered out by the service itself — so there is nothing unpublished this
@@ -17,7 +17,7 @@ import { subscribe as subscribePresence, getOnline } from "./presence"
 
 // ---- TYPES -----------------------------------------------------------------
 
-/** One row of GET /posts. Mirrors the API's PostSummaryDto. */
+/** One row of GET /v1/posts. Mirrors the API's PostSummaryDto. */
 export type PostSummary = {
   slug: string
   /** Zero-padded entry number, e.g. "002". The API calls this `no`. */
@@ -33,7 +33,7 @@ export type PostSummary = {
   alt: string
 }
 
-/** GET /posts/:slug — a summary plus the raw GitHub-flavoured markdown. */
+/** GET /v1/posts/:slug — a summary plus the raw GitHub-flavoured markdown. */
 export type PostDetail = PostSummary & { body: string }
 
 export type IndexState =
@@ -53,7 +53,7 @@ export type BodyState =
 // exactly that reason — a 4.7MP inflate there would stall every connected
 // session at once. So the blog takes `media.alt` and never touches media.src.
 
-export const DEFAULT_URL = "https://api.lrnzo.space/posts"
+export const DEFAULT_URL = "https://api.lrnzo.space/v1/posts"
 /** One page covers the corpus by orders of magnitude; the API clamps to 100. */
 export const PAGE_LIMIT = 100
 /** How long an index stays fresh before the next open revalidates it. */
@@ -194,7 +194,7 @@ export function parseSummary(raw: unknown): PostSummary | null {
   }
 }
 
-/** GET /posts is WRAPPED in {data,total,page,limit}; the detail route is not. */
+/** GET /v1/posts is WRAPPED in {data,total,page,limit}; the detail route is not. */
 export function parseIndex(raw: unknown): PostSummary[] | null {
   if (typeof raw !== "object" || raw === null) return null
   const data = (raw as Record<string, unknown>).data
