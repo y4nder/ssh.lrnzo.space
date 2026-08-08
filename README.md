@@ -45,7 +45,7 @@ A live Spotify readout — a ticker above the status bar, and a full page on `m`
 laid out as a Spotify-Code card: cover art rendered as a themed halftone, its
 signature wave strip fused to the bottom edge, track centred beneath. `c` flips
 the cover for a QR you can scan to open the song on your phone. Data comes from
-`GET /now-playing` on [api.lrnzo.space](https://api.lrnzo.space/now-playing),
+`GET /v1/now-playing` on [api.lrnzo.space](https://api.lrnzo.space/v1/now-playing),
 which also feeds the website's banner.
 
 The wave strip is a **deterministic signature of the track**, not a spectrum
@@ -110,9 +110,9 @@ bun run typecheck
 | `IDLE_TIMEOUT_MS` | — | disconnect idle sessions |
 | `DB_PATH` | `data/portfolio.db` | visitor counter + guestbook |
 | `GUESTBOOK_RATE_MIN` | `10` | minutes between entries per IP |
-| `NOWPLAYING_URL` | `https://api.lrnzo.space/now-playing` | **set to `""` to disable the readout** |
+| `NOWPLAYING_URL` | `https://api.lrnzo.space/v1/now-playing` | **set to `""` to disable the readout** |
 | `NOWPLAYING_FIXTURE` | — | a `/now-playing` payload as JSON: publishes once, never polls |
-| `BLOG_URL` | `https://api.lrnzo.space/posts` | **set to `""` to disable the log** |
+| `BLOG_URL` | `https://api.lrnzo.space/v1/posts` | **set to `""` to disable the log** |
 | `BLOG_FIXTURE` | — | an array of posts *with bodies*: seeds the index and the reader, never fetches |
 
 Both fixtures are how the two API-backed pages get exercised offline — the tests
@@ -133,7 +133,7 @@ BLOG_FIXTURE='[{"slug":"a-post","no":"001","title":"A post","dek":"A summary.",
 `bun test` sets `NODE_ENV=test`, which disables both outright — the suite never
 touches the network, including the server the smoke test spawns.
 
-The log is **read-only**: the app issues `GET /posts` and `GET /posts/:slug` and
+The log is **read-only**: the app issues `GET /v1/posts` and `GET /v1/posts/:slug` and
 nothing else. It fetches on demand rather than polling, and caches the index for
 five minutes — every visitor shares this box's single egress IP against the
 API's 100 req/min limit.

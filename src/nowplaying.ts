@@ -1,4 +1,4 @@
-// Live Spotify readout, fed by GET /now-playing on api.lrnzo.space.
+// Live Spotify readout, fed by GET /v1/now-playing on api.lrnzo.space.
 //
 // THE FIRST OUTBOUND HTTP CALL IN THIS CODEBASE, and the shape is dictated by
 // the deployment: one Bun process serves every SSH session from ONE VPS IP, and
@@ -53,7 +53,7 @@ export const REQUEST_TIMEOUT_MS = 5_000
  * minutes, so reaching this count means it is genuinely unreachable.
  */
 export const HIDE_AFTER_FAILURES = 2
-export const DEFAULT_URL = "https://api.lrnzo.space/now-playing"
+export const DEFAULT_URL = "https://api.lrnzo.space/v1/now-playing"
 
 export function clock(): number {
   return performance.now()
